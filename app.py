@@ -2,8 +2,9 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
+import streamlit.components.v1 as components
 
-st.set_page_config(page_title="Red Ambiental - V42 Pro Zebra", layout="wide", page_icon="♻️")
+st.set_page_config(page_title="Red Ambiental - V42 Pro Zebra LIVE", layout="wide", page_icon="♻️")
 
 st.markdown("""
 <style>
@@ -77,10 +78,28 @@ total = len(df)
 dentro = (df['¿Dentro?_NORM']=='DENTRO').sum()
 fuera = total - dentro
 
-st.markdown(f'<div style="background:#0f3d1f; color:white; padding:10px 15px; border-radius:6px; display:flex; justify-content:space-between;"><span style="font-weight:800;">RED AMBIENTAL | {planta_sel} | {coord_sel}</span><span style="font-size:11px;">Total: {total} | DENTRO: {dentro} | FUERA: {fuera} | LIVE {pd.Timestamp.now().strftime("%H:%M")}</span></div>', unsafe_allow_html=True)
+# HEADER NUEVO CON FECHA Y HORA EN VIVO WE - HASTA ARRIBA
+components.html(f"""
+<div style="background:#0f3d1f; color:white; padding:10px 15px; border-radius:6px; display:flex; justify-content:space-between; align-items:center; font-family:Arial; box-shadow:0 2px 4px rgba(0,0,0,0.2);">
+    <span style="font-weight:800; font-size:14px;">RED AMBIENTAL | {planta_sel} | {coord_sel}</span>
+    <div style="text-align:right; font-size:11px; line-height:15px;">
+        <div>Total: {total} | DENTRO: {dentro} | FUERA: {fuera}</div>
+        <div id="reloj" style="font-weight:800; font-size:13px; color:#00ff88; margin-top:2px;"></div>
+    </div>
+</div>
+<script>
+function actualizarReloj() {{
+    const ahora = new Date().toLocaleString("es-MX", {{timeZone: "America/Monterrey", weekday:'long', year:'numeric', month:'long', day:'numeric', hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:true}});
+    document.getElementById("reloj").innerHTML = "🕒 " + ahora.toUpperCase() + " | LIVE";
+}}
+setInterval(actualizarReloj, 1000);
+actualizarReloj();
+</script>
+""", height=75)
+
 st.write("")
 
-# --- FILA 1 - TUS DONAS WE ---
+# FILA 1 DONAS
 c1,c2,c3,c4 = st.columns([0.9,1.1,1.1,1.1])
 with c1:
     pct = (dentro/total*100) if total>0 else 0
@@ -106,7 +125,7 @@ with c4:
     st.plotly_chart(fig3, use_container_width=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
-# --- FILA 2 - TUS GRAFICAS DE COMPORTAMIENTO WE ---
+# FILA 2
 r2c1,r2c2,r2c3 = st.columns([1.4,1.0,1.0])
 with r2c1:
     st.markdown('<div class="gepp-card"><div class="gepp-header">REGISTRO OPERATIVO / DETALLE POR EMPLEADO</div>', unsafe_allow_html=True)
@@ -134,7 +153,7 @@ with r2c3:
         st.plotly_chart(fig_bar, use_container_width=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
-# --- FILA 3 - MAPA CON TRAFICO ---
+# FILA 3 MAPA
 r3c1,r3c2 = st.columns([1.2,0.8])
 with r3c1:
     st.markdown('<div class="gepp-card"><div class="gepp-header">MAPA LIVE - Latitud / Longitud - Con Tráfico</div>', unsafe_allow_html=True)
@@ -155,7 +174,7 @@ with r3c1:
                     color = 'green' if str(row.get('¿Dentro?','')).upper()=='DENTRO' else 'red'
                     folium.CircleMarker(location=[row['Latitud'], row['Longitud']], radius=6, color=color, fill=True, popup=f"{row.get('Planta','')} - {row.get('Coordinador','')}").add_to(m)
                 st_folium(m, width=700, height=350)
-            except Exception as e:
+            except:
                 st.map(df_map, latitude="Latitud", longitude="Longitud", zoom=12)
     st.markdown("</div>", unsafe_allow_html=True)
 with r3c2:
@@ -166,18 +185,18 @@ with r3c2:
         st.plotly_chart(fig_hist, use_container_width=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
-# --- FILA 4 - TU TABLA ZEBRA PRO QUE YA TE GUSTO WE ---
+# FILA 4 TABLA ZEBRA PRO
 def render_zebra(df_to_show):
     html = """
     <style>
-  .zebra-table { width:100%; border-collapse:collapse; font-size:12px; font-family:Arial; }
-  .zebra-table th { background:#0f3d1f; color:white; padding:8px; text-align:left; position:sticky; top:0; }
-  .zebra-table td { padding:7px 8px; border-bottom:1px solid #e0e0e0; }
-  .zebra-table tr:nth-child(even) { background:#f2f4f7; }
-  .zebra-table tr:nth-child(odd) { background:#ffffff; }
-  .zebra-table tr:hover { background:#d1e7dd!important; }
-  .badge-dentro { background:#00b050; color:white; padding:2px 6px; border-radius:10px; font-weight:bold; font-size:10px; }
-  .badge-fuera { background:#ff0000; color:white; padding:2px 6px; border-radius:10px; font-weight:bold; font-size:10px; }
+ .zebra-table { width:100%; border-collapse:collapse; font-size:12px; font-family:Arial; }
+ .zebra-table th { background:#0f3d1f; color:white; padding:8px; text-align:left; position:sticky; top:0; }
+ .zebra-table td { padding:7px 8px; border-bottom:1px solid #e0e0e0; }
+ .zebra-table tr:nth-child(even) { background:#f2f4f7; }
+ .zebra-table tr:nth-child(odd) { background:#ffffff; }
+ .zebra-table tr:hover { background:#d1e7dd!important; }
+ .badge-dentro { background:#00b050; color:white; padding:2px 6px; border-radius:10px; font-weight:bold; font-size:10px; }
+ .badge-fuera { background:#ff0000; color:white; padding:2px 6px; border-radius:10px; font-weight:bold; font-size:10px; }
     </style>
     <div style="max-height:500px; overflow:auto; background:white;">
     <table class="zebra-table"><thead><tr>
@@ -204,4 +223,4 @@ df_show = df[cols_final].tail(100).fillna("")
 st.markdown(render_zebra(df_show), unsafe_allow_html=True)
 st.markdown("</div>", unsafe_allow_html=True)
 
-st.caption(f"© RED AMBIENTAL V42 PRO ZEBRA DRIVE | {total} registros | {planta_sel} | {coord_sel}")
+st.caption(f"© RED AMBIENTAL V42 PRO ZEBRA LIVE DRIVE | {total} registros | {planta_sel} | {coord_sel}")
