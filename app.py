@@ -119,8 +119,14 @@ with c3:
     st.markdown("</div>", unsafe_allow_html=True)
 with c4:
     st.markdown('<div class="gepp-card"><div class="gepp-header">Semáforo Plantilla</div>', unsafe_allow_html=True)
+    # === CORREGIDO WE - COLORES COMO DEBEN SER ===
+    orden = ['Malo', 'Bueno', 'Excelente']
+    colores_map = {'Malo': '#ff0000', 'Bueno': '#ffcc00', 'Excelente': '#00b050'}
     counts = df['Semáforo'].value_counts()
-    fig3 = go.Figure(data=[go.Pie(labels=counts.index, values=counts.values, hole=0.65, marker_colors=['#00b050','#ffff00','#ff0000'])])
+    # Asegurar que siempre existan las 3 categorias aunque sea en 0
+    valores = [counts.get(cat, 0) for cat in orden]
+    colores = [colores_map[cat] for cat in orden]
+    fig3 = go.Figure(data=[go.Pie(labels=orden, values=valores, hole=0.65, marker_colors=colores, sort=False, textinfo='label+percent')])
     fig3.update_layout(height=280, margin=dict(l=10,r=10,t=10,b=10), paper_bgcolor="white")
     st.plotly_chart(fig3, use_container_width=True)
     st.markdown("</div>", unsafe_allow_html=True)
@@ -189,14 +195,14 @@ with r3c2:
 def render_zebra(df_to_show):
     html = """
     <style>
- .zebra-table { width:100%; border-collapse:collapse; font-size:12px; font-family:Arial; }
- .zebra-table th { background:#0f3d1f; color:white; padding:8px; text-align:left; position:sticky; top:0; }
- .zebra-table td { padding:7px 8px; border-bottom:1px solid #e0e0e0; }
- .zebra-table tr:nth-child(even) { background:#f2f4f7; }
- .zebra-table tr:nth-child(odd) { background:#ffffff; }
- .zebra-table tr:hover { background:#d1e7dd!important; }
- .badge-dentro { background:#00b050; color:white; padding:2px 6px; border-radius:10px; font-weight:bold; font-size:10px; }
- .badge-fuera { background:#ff0000; color:white; padding:2px 6px; border-radius:10px; font-weight:bold; font-size:10px; }
+.zebra-table { width:100%; border-collapse:collapse; font-size:12px; font-family:Arial; }
+.zebra-table th { background:#0f3d1f; color:white; padding:8px; text-align:left; position:sticky; top:0; }
+.zebra-table td { padding:7px 8px; border-bottom:1px solid #e0e0e0; }
+.zebra-table tr:nth-child(even) { background:#f2f4f7; }
+.zebra-table tr:nth-child(odd) { background:#ffffff; }
+.zebra-table tr:hover { background:#d1e7dd!important; }
+.badge-dentro { background:#00b050; color:white; padding:2px 6px; border-radius:10px; font-weight:bold; font-size:10px; }
+.badge-fuera { background:#ff0000; color:white; padding:2px 6px; border-radius:10px; font-weight:bold; font-size:10px; }
     </style>
     <div style="max-height:500px; overflow:auto; background:white;">
     <table class="zebra-table"><thead><tr>
