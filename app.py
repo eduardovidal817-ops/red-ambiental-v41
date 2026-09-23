@@ -98,33 +98,23 @@ actualizarReloj();
 
 st.write("")
 
-# FILA 1 DONAS - CORREGIDA CENTRADA WE
+# FILA 1 DONAS - CENTRADAS
 c1,c2,c3,c4 = st.columns([0.9,1.1,1.1,1.1])
 with c1:
     pct = (dentro/total*100) if total>0 else 0
     st.markdown(f'<div class="gepp-card" style="background:#0f2a1a; color:white; padding:15px; height:320px; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center;"><p style="font-size:10px; color:#a0c4a8; font-weight:bold;">PLANTILLA DENTRO GEOCERCA</p><p style="font-size:42px; font-weight:800; margin:20px 0 0 0;">{pct:.1f}%</p><p style="font-size:11px;">DENTRO: {dentro} / {total}</p><div style="width:40px; height:40px; background:{"#00ff66" if pct>50 else "#ff0000"}; border-radius:50%; margin-top:15px;"></div></div>', unsafe_allow_html=True)
 with c2:
     st.markdown('<div class="gepp-card"><div class="gepp-header">Plantilla Dentro Geocerca - ¿Dentro?</div>', unsafe_allow_html=True)
-    fig = go.Figure(data=[go.Pie(
-        labels=['FUERA','DENTRO'], values=[fuera, dentro], hole=0.65,
-        marker_colors=['#ff0000','#0f3d1f'],
-        textinfo='percent', textposition='inside', insidetextorientation='horizontal',
-        sort=False
-    )])
-    fig.update_layout(height=280, margin=dict(l=10,r=10,t=60,b=10), paper_bgcolor="white", showlegend=True, legend=dict(orientation="h", y=1.15, x=0.5, xanchor="center", yanchor="bottom", font=dict(size=11)))
+    fig = go.Figure(data=[go.Pie(labels=['FUERA','DENTRO'], values=[fuera, dentro], hole=0.65, marker_colors=['#ff0000','#0f3d1f'], textinfo='percent', textposition='inside', sort=False)])
+    fig.update_layout(height=280, margin=dict(l=10,r=10,t=60,b=10), paper_bgcolor="white", showlegend=True, legend=dict(orientation="h", y=1.15, x=0.5, xanchor="center"))
     fig.update_traces(domain=dict(x=[0,1], y=[0,0.85]))
     st.plotly_chart(fig, use_container_width=True)
     st.markdown("</div>", unsafe_allow_html=True)
 with c3:
     st.markdown('<div class="gepp-card"><div class="gepp-header">Plantilla Completa - Horas Trabajadas</div>', unsafe_allow_html=True)
     comp = (df['Plantilla Completa']=='Completa').sum()
-    fig2 = go.Figure(data=[go.Pie(
-        labels=['Incompleta','Completa'], values=[total-comp, comp], hole=0.65,
-        marker_colors=['#ff8c42','#0f3d1f'],
-        textinfo='percent', textposition='inside', insidetextorientation='horizontal',
-        sort=False
-    )])
-    fig2.update_layout(height=280, margin=dict(l=10,r=10,t=60,b=10), paper_bgcolor="white", showlegend=True, legend=dict(orientation="h", y=1.15, x=0.5, xanchor="center", font=dict(size=11)))
+    fig2 = go.Figure(data=[go.Pie(labels=['Incompleta','Completa'], values=[total-comp, comp], hole=0.65, marker_colors=['#ff8c42','#0f3d1f'], textinfo='percent', textposition='inside', sort=False)])
+    fig2.update_layout(height=280, margin=dict(l=10,r=10,t=60,b=10), paper_bgcolor="white", showlegend=True, legend=dict(orientation="h", y=1.15, x=0.5, xanchor="center"))
     fig2.update_traces(domain=dict(x=[0,1], y=[0,0.85]))
     st.plotly_chart(fig2, use_container_width=True)
     st.markdown("</div>", unsafe_allow_html=True)
@@ -135,12 +125,8 @@ with c4:
     counts = df['Semáforo'].value_counts()
     valores = [counts.get(cat, 0) for cat in orden]
     colores = [colores_map[cat] for cat in orden]
-    fig3 = go.Figure(data=[go.Pie(
-        labels=orden, values=valores, hole=0.65,
-        marker_colors=colores, sort=False,
-        textinfo='percent', textposition='inside', insidetextorientation='horizontal'
-    )])
-    fig3.update_layout(height=280, margin=dict(l=10,r=10,t=60,b=10), paper_bgcolor="white", showlegend=True, legend=dict(orientation="h", y=1.15, x=0.5, xanchor="center", font=dict(size=11)))
+    fig3 = go.Figure(data=[go.Pie(labels=orden, values=valores, hole=0.65, marker_colors=colores, sort=False, textinfo='percent', textposition='inside')])
+    fig3.update_layout(height=280, margin=dict(l=10,r=10,t=60,b=10), paper_bgcolor="white", showlegend=True, legend=dict(orientation="h", y=1.15, x=0.5, xanchor="center"))
     fig3.update_traces(domain=dict(x=[0,1], y=[0,0.85]))
     st.plotly_chart(fig3, use_container_width=True)
     st.markdown("</div>", unsafe_allow_html=True)
@@ -205,6 +191,7 @@ with r3c2:
         st.plotly_chart(fig_hist, use_container_width=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
+# FILA 4 TABLA ZEBRA PRO - ESTA ERA LA QUE FALLABA WE
 def render_zebra(df_to_show):
     html = """
     <style>
@@ -239,6 +226,7 @@ st.markdown('<div class="gepp-card"><div class="gepp-header">DETALLE - PERSONAL 
 cols_final = ['Fecha','Hora Entrada','Hora Salida','Horas Trabajadas','Nombre completo','Numero Empleado','Latitud','Longitud','¿Dentro?','Fotos','Planta','Coordinador','Semáforo']
 cols_final = [c for c in cols_final if c in df.columns]
 df_show = df[cols_final].tail(100).fillna("")
+# AQUI ESTABA EL ERROR WE, FALTABA EL unsafe_allow_html=True
 st.markdown(render_zebra(df_show), unsafe_allow_html=True)
 st.markdown("</div>", unsafe_allow_html=True)
 
