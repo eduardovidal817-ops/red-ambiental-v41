@@ -12,6 +12,18 @@ st.markdown("""
 section[data-testid="stSidebar"] { background-color: #0a2211; }
 .gepp-card { background:white; border:1px solid #b0b8c8; border-radius:6px; overflow:hidden; margin-bottom:8px; box-shadow:0 1px 3px rgba(0,0,0,0.1); }
 .gepp-header { background:#0f3d1f; color:white; padding:6px 12px; font-size:11px; font-weight:700; text-align:center; text-transform:uppercase; }
+.search-box input { background:white!important; border:2px solid #0f3d1f!important; border-radius:8px!important; }
+.zebra-table { width:100%; border-collapse:collapse; font-size:12px; font-family:Arial; }
+.zebra-table th { background:#0f3d1f; color:white; padding:8px; text-align:left; position:sticky; top:0; }
+.zebra-table td { padding:7px 8px; border-bottom:1px solid #e0e0e0; }
+.zebra-table tr:nth-child(even) { background:#f2f4f7; }
+.zebra-table tr:nth-child(odd) { background:#ffffff; }
+.zebra-table tr:hover { background:#d1e7dd!important; }
+.badge-dentro { background:#00b050; color:white; padding:2px 6px; border-radius:10px; font-weight:bold; font-size:10px; }
+.badge-fuera { background:#ff0000; color:white; padding:2px 6px; border-radius:10px; font-weight:bold; font-size:10px; }
+.badge-excelente { background:#00b050; color:white; padding:2px 6px; border-radius:10px; font-weight:bold; font-size:10px; }
+.badge-bueno { background:#ffcc00; color:black; padding:2px 6px; border-radius:10px; font-weight:bold; font-size:10px; }
+.badge-malo { background:#ff0000; color:white; padding:2px 6px; border-radius:10px; font-weight:bold; font-size:10px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -35,6 +47,45 @@ def load():
     return df
 
 df_full = load()
+
+# FUNCION ZEBRA - PARA LAS 2 TABLAS WE
+def render_zebra(df_to_show, max_h="340px"):
+    html = f"""
+    <style>
+   .zebra-table {{ width:100%; border-collapse:collapse; font-size:11px; font-family:Arial; }}
+   .zebra-table th {{ background:#0f3d1f; color:white; padding:8px; text-align:left; position:sticky; top:0; z-index:2; }}
+   .zebra-table td {{ padding:7px 8px; border-bottom:1px solid #e0e0e0; }}
+   .zebra-table tr:nth-child(even) {{ background:#f2f4f7; }}
+   .zebra-table tr:nth-child(odd) {{ background:#ffffff; }}
+   .zebra-table tr:hover {{ background:#d1e7dd!important; }}
+   .badge-dentro {{ background:#00b050; color:white; padding:2px 6px; border-radius:10px; font-weight:bold; font-size:10px; }}
+   .badge-fuera {{ background:#ff0000; color:white; padding:2px 6px; border-radius:10px; font-weight:bold; font-size:10px; }}
+   .badge-excelente {{ background:#00b050; color:white; padding:2px 6px; border-radius:10px; font-weight:bold; font-size:10px; }}
+   .badge-bueno {{ background:#ffcc00; color:black; padding:2px 6px; border-radius:10px; font-weight:bold; font-size:10px; }}
+   .badge-malo {{ background:#ff0000; color:white; padding:2px 6px; border-radius:10px; font-weight:bold; font-size:10px; }}
+    </style>
+    <div style="max-height:{max_h}; overflow:auto; background:white; border-radius:0 0 6px 6px;">
+    <table class="zebra-table"><thead><tr>
+    """
+    for col in df_to_show.columns: html += f"<th>{col}</th>"
+    html += "</tr></thead><tbody>"
+    for _, row in df_to_show.iterrows():
+        html += "<tr>"
+        for col in df_to_show.columns:
+            val = row[col]
+            sval = str(val).upper()
+            if col == "¿Dentro?":
+                if sval == "DENTRO": html += f'<td><span class="badge-dentro">DENTRO</span></td>'
+                else: html += f'<td><span class="badge-fuera">FUERA</span></td>'
+            elif col == "Semáforo":
+                if sval == "EXCELENTE": html += f'<td><span class="badge-excelente">{val}</span></td>'
+                elif sval == "BUENO": html += f'<td><span class="badge-bueno">{val}</span></td>'
+                else: html += f'<td><span class="badge-malo">{val}</span></td>'
+            elif col == "Fotos" and pd.notna(val) and str(val).startswith("http"): html += f'<td><a href="{val}" target="_blank" style="color:#0f3d1f; font-weight:bold;">Ver</a></td>'
+            else: html += f"<td>{val}</td>"
+        html += "</tr>"
+    html += "</tbody></table></div>"
+    return html
 
 with st.sidebar:
     try: st.image("logo.png", use_container_width=True)
@@ -78,6 +129,7 @@ total = len(df)
 dentro = (df['¿Dentro?_NORM']=='DENTRO').sum()
 fuera = total - dentro
 
+# HEADER + RELOJ + BUSCADOR WE
 components.html(f"""
 <div style="background:#0f3d1f; color:white; padding:10px 15px; border-radius:6px; display:flex; justify-content:space-between; align-items:center; font-family:Arial; box-shadow:0 2px 4px rgba(0,0,0,0.2);">
     <span style="font-weight:800; font-size:14px;">RED AMBIENTAL | {planta_sel} | {coord_sel}</span>
@@ -97,8 +149,26 @@ actualizarReloj();
 """, height=75)
 
 st.write("")
+# BARRA DE BUSCADOR HASTA ARRIBA WE
+busqueda = st.text_input("🔍 Buscar por Nombre, # Empleado, Planta, Coordinador, Fecha...", placeholder="Escribe aquí para filtrar todo el dashboard...", key="buscador_global")
 
-# FILA 1 DONAS - CENTRADAS
+if busqueda:
+    busq = busqueda.upper().strip()
+    # Filtra por varias columnas
+    mask = False
+    for col in ['Nombre completo','Numero Empleado','Planta','Coordinador','Fecha','Semáforo','¿Dentro?']:
+        if col in df.columns:
+            if isinstance(mask, bool):
+                mask = df[col].astype(str).str.upper().str.contains(busq, na=False)
+            else:
+                mask = mask | df[col].astype(str).str.upper().str.contains(busq, na=False)
+    if isinstance(mask, pd.Series):
+        df = df[mask]
+        total = len(df)
+        dentro = (df['¿Dentro?_NORM']=='DENTRO').sum()
+        fuera = total - dentro
+
+# FILA 1 DONAS
 c1,c2,c3,c4 = st.columns([0.9,1.1,1.1,1.1])
 with c1:
     pct = (dentro/total*100) if total>0 else 0
@@ -131,13 +201,14 @@ with c4:
     st.plotly_chart(fig3, use_container_width=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
-# FILA 2
+# FILA 2 - AHORA LAS 2 ZEBRA WE
 r2c1,r2c2,r2c3 = st.columns([1.4,1.0,1.0])
 with r2c1:
-    st.markdown('<div class="gepp-card"><div class="gepp-header">REGISTRO OPERATIVO / DETALLE POR EMPLEADO</div>', unsafe_allow_html=True)
+    st.markdown('<div class="gepp-card"><div class="gepp-header">REGISTRO OPERATIVO / DETALLE POR EMPLEADO - ZEBRA PRO</div>', unsafe_allow_html=True)
     cols1 = ['Fecha','Hora Entrada','Hora Salida','Horas Trabajadas','Tiempo Extra','Nombre completo','Numero Empleado','¿Dentro?','Semáforo']
     cols1 = [c for c in cols1 if c in df.columns]
-    st.dataframe(df[cols1].tail(12), use_container_width=True, height=320)
+    df_r2 = df[cols1].tail(20).fillna("")
+    components.html(render_zebra(df_r2, "340px"), height=360, scrolling=True)
     st.markdown("</div>", unsafe_allow_html=True)
 with r2c2:
     st.markdown('<div class="gepp-card"><div class="gepp-header">COMPORTAMIENTO POR DÍA - Fecha</div>', unsafe_allow_html=True)
@@ -191,43 +262,12 @@ with r3c2:
         st.plotly_chart(fig_hist, use_container_width=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
-# FILA 4 TABLA ZEBRA PRO - ESTA ERA LA QUE FALLABA WE
-def render_zebra(df_to_show):
-    html = """
-    <style>
-.zebra-table { width:100%; border-collapse:collapse; font-size:12px; font-family:Arial; }
-.zebra-table th { background:#0f3d1f; color:white; padding:8px; text-align:left; position:sticky; top:0; }
-.zebra-table td { padding:7px 8px; border-bottom:1px solid #e0e0e0; }
-.zebra-table tr:nth-child(even) { background:#f2f4f7; }
-.zebra-table tr:nth-child(odd) { background:#ffffff; }
-.zebra-table tr:hover { background:#d1e7dd!important; }
-.badge-dentro { background:#00b050; color:white; padding:2px 6px; border-radius:10px; font-weight:bold; font-size:10px; }
-.badge-fuera { background:#ff0000; color:white; padding:2px 6px; border-radius:10px; font-weight:bold; font-size:10px; }
-    </style>
-    <div style="max-height:500px; overflow:auto; background:white;">
-    <table class="zebra-table"><thead><tr>
-    """
-    for col in df_to_show.columns: html += f"<th>{col}</th>"
-    html += "</tr></thead><tbody>"
-    for _, row in df_to_show.iterrows():
-        html += "<tr>"
-        for col in df_to_show.columns:
-            val = row[col]
-            if col == "¿Dentro?":
-                if str(val).upper() == "DENTRO": html += f'<td><span class="badge-dentro">DENTRO</span></td>'
-                else: html += f'<td><span class="badge-fuera">FUERA</span></td>'
-            elif col == "Fotos" and pd.notna(val) and str(val).startswith("http"): html += f'<td><a href="{val}" target="_blank" style="color:#0f3d1f; font-weight:bold;">Ver</a></td>'
-            else: html += f"<td>{val}</td>"
-        html += "</tr>"
-    html += "</tbody></table></div>"
-    return html
-
+# FILA 4 TABLA ZEBRA PRO
 st.markdown('<div class="gepp-card"><div class="gepp-header">DETALLE - PERSONAL - PRO ZEBRA - LEYENDO DEL DRIVE</div>', unsafe_allow_html=True)
 cols_final = ['Fecha','Hora Entrada','Hora Salida','Horas Trabajadas','Nombre completo','Numero Empleado','Latitud','Longitud','¿Dentro?','Fotos','Planta','Coordinador','Semáforo']
 cols_final = [c for c in cols_final if c in df.columns]
 df_show = df[cols_final].tail(100).fillna("")
-# AQUI ESTABA EL ERROR WE, FALTABA EL unsafe_allow_html=True
-st.markdown(render_zebra(df_show), unsafe_allow_html=True)
+components.html(render_zebra(df_show, "500px"), height=520, scrolling=True)
 st.markdown("</div>", unsafe_allow_html=True)
 
-st.caption(f"© RED AMBIENTAL V42 PRO ZEBRA LIVE DRIVE | {total} registros | {planta_sel} | {coord_sel}")
+st.caption(f"© RED AMBIENTAL V42 PRO ZEBRA LIVE DRIVE | {total} registros | {planta_sel} | {coord_sel} | Búsqueda: {busqueda if busqueda else 'Todos'}")
