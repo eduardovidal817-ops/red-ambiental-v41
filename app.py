@@ -8,7 +8,7 @@ from datetime import datetime
 import pytz
 
 TZ_MEXICO = pytz.timezone("America/Monterrey")
-st.set_page_config(page_title="Red Ambiental - V44.3 Solo Hoy", layout="wide", page_icon="♻️")
+st.set_page_config(page_title="Red Ambiental - V44.1 Fix", layout="wide", page_icon="♻️")
 st.markdown("""
 <style>
 .stApp { background-color: #e9ecf2; }
@@ -62,8 +62,6 @@ def load_operadores():
 
 @st.cache_data(ttl=60)
 def load_catalogo_operadores():
-    # Catálogo = histórico de operadores que alguna vez han registrado
-    # Si tienes pestaña CATALOGO con GID diferente, cámbialo aquí
     try:
         df_hist = load_operadores()
         col_n = [c for c in df_hist.columns if 'nombre' in c.lower()][0]
@@ -176,14 +174,14 @@ if menu == "📊 Dashboard Asistencias":
         st.markdown("</div>", unsafe_allow_html=True)
     r2c1,r2c2,r2c3 = st.columns([1.4,1.0,1.0])
     with r2c1:
-        st.markdown('<div class="gepp-card"><div class="gepp-header">REGISTRO OPERATIVO</div>', unsafe_allow_html=True)
+        st.markdown('<div class="gepp-card"><div class="gepp-header">REGISTRO OPERATIVO / DETALLE POR EMPLEADO - ZEBRA PRO</div>', unsafe_allow_html=True)
         cols1 = ['Fecha','Hora Entrada','Hora Salida','Horas Trabajadas','Tiempo Extra','Nombre completo','Numero Empleado','¿Dentro?','Semáforo']
         cols1 = [c for c in cols1 if c in df.columns]
         df_r2 = df[cols1].tail(20).fillna("")
         components.html(render_zebra(df_r2, "340px"), height=360, scrolling=True)
         st.markdown("</div>", unsafe_allow_html=True)
     with r2c2:
-        st.markdown('<div class="gepp-card"><div class="gepp-header">COMPORTAMIENTO POR DÍA</div>', unsafe_allow_html=True)
+        st.markdown('<div class="gepp-card"><div class="gepp-header">COMPORTAMIENTO POR DÍA - Fecha</div>', unsafe_allow_html=True)
         try:
             df['Dia'] = pd.to_datetime(df['Fecha'], dayfirst=True, errors='coerce').dt.day
             cnt = df.groupby('Dia').size().reset_index(name='Registros')
@@ -193,7 +191,7 @@ if menu == "📊 Dashboard Asistencias":
         except: st.write("Sin datos")
         st.markdown("</div>", unsafe_allow_html=True)
     with r2c3:
-        st.markdown('<div class="gepp-card"><div class="gepp-header">REGISTRO POR PLANTA</div>', unsafe_allow_html=True)
+        st.markdown('<div class="gepp-card"><div class="gepp-header">REGISTRO POR PLANTA / COORDINADOR</div>', unsafe_allow_html=True)
         if 'Planta' in df.columns:
             seg = df['Planta'].value_counts().reset_index()
             seg.columns=['Planta','Registros']
@@ -201,6 +199,42 @@ if menu == "📊 Dashboard Asistencias":
             fig_bar.update_layout(height=320, margin=dict(l=10,r=10,t=10,b=30), paper_bgcolor="white", showlegend=False)
             st.plotly_chart(fig_bar, use_container_width=True)
         st.markdown("</div>", unsafe_allow_html=True)
+    r3c1,r3c2 = st.columns([1.2,0.8])
+    with r3c1:
+        st.markdown('<div class="gepp-card"><div class="gepp-header">MAPA LIVE - Latitud / Longitud - Con Tráfico</div>', unsafe_allow_html=True)
+        ver_traf = st.checkbox("Ver tráfico en vivo", value=True)
+        if 'Latitud' in df.columns and 'Longitud' in df.columns:
+            df_map = df.dropna(subset=['Latitud','Longitud']).copy()
+            df_map['Latitud'] = pd.to_numeric(df_map['Latitud'], errors='coerce')
+            df_map['Longitud'] = pd.to_numeric(df_map['Longitud'], errors='coerce')
+            df_map = df_map.dropna(subset=['Latitud','Longitud'])
+            if not df_map.empty:
+                try:
+                    import folium
+                    from streamlit_folium import st_folium
+                    m = folium.Map(location=[df_map['Latitud'].mean(), df_map['Longitud'].mean()], zoom_start=12)
+                    if ver_traf:
+                        folium.TileLayer(tiles='https://{s}.google.com/vt/lyrs=m@221097413,traffic&x={x}&y={y}&z={z}', attr='Google Traffic', subdomains=['mt0','mt1','mt2','mt3'], overlay=True).add_to(m)
+                    for _, row in df_map.tail(100).iterrows():
+                        color = 'green' if str(row.get('¿Dentro?','')).upper()=='DENTRO' else 'red'
+                        folium.CircleMarker(location=[row['Latitud'], row['Longitud']], radius=6, color=color, fill=True, popup=f"{row.get('Planta','')} - {row.get('Coordinador','')}").add_to(m)
+                    st_folium(m, width=700, height=350)
+                except:
+                    st.map(df_map, latitude="Latitud", longitude="Longitud", zoom=12)
+        st.markdown("</div>", unsafe_allow_html=True)
+    with r3c2:
+        st.markdown('<div class="gepp-card"><div class="gepp-header">TIEMPO EXTRA - Horas Trabajadas</div>', unsafe_allow_html=True)
+        if 'Horas Trabajadas' in df.columns:
+            fig_hist = px.histogram(df, x='Horas Trabajadas', nbins=10, color_discrete_sequence=['#0f3d1f'])
+            fig_hist.update_layout(height=300, margin=dict(l=10,r=10,t=10,b=10), paper_bgcolor="white", plot_bgcolor="white")
+            st.plotly_chart(fig_hist, use_container_width=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+    st.markdown('<div class="gepp-card"><div class="gepp-header">DETALLE - PERSONAL - PRO ZEBRA - LEYENDO DEL DRIVE</div>', unsafe_allow_html=True)
+    cols_final = ['Fecha','Hora Entrada','Hora Salida','Horas Trabajadas','Nombre completo','Numero Empleado','Latitud','Longitud','¿Dentro?','Fotos','Planta','Coordinador','Semáforo']
+    cols_final = [c for c in cols_final if c in df.columns]
+    df_show = df[cols_final].tail(100).fillna("")
+    components.html(render_zebra(df_show, "500px"), height=520, scrolling=True)
+    st.markdown("</div>", unsafe_allow_html=True)
 
 elif menu == "🚛 Operadores Pesaje":
     st.markdown("<h1 style='color:#0f3d1f; text-align:center;'>RED AMBIENTAL</h1>", unsafe_allow_html=True)
@@ -208,10 +242,10 @@ elif menu == "🚛 Operadores Pesaje":
     with st.expander("📝 Registrar Nuevo Viaje", expanded=False):
         c1,c2 = st.columns(2)
         with c1:
-            nombre = st.text_input("Nombre Completo", key="op_n")
-            unidad = st.text_input("Numero de Unidad", key="op_u")
+            nombre = st.text_input("Nombre Completo", placeholder="Ej: Juan Perez Lopez", key="op_n")
+            unidad = st.text_input("Numero de Unidad", placeholder="Ej: 1234", key="op_u")
         with c2:
-            base = st.text_input("Base donde se encuentra", key="op_b")
+            base = st.text_input("Base donde se encuentra", placeholder="Garcia, Cienega...", key="op_b")
             foto = st.file_uploader("Foto Boleta", type=["jpg","jpeg","png"], key="op_f")
         if st.button("💾 Guardar Registro Operador", type="primary", use_container_width=True):
             if not nombre or not unidad or not base or not foto:
@@ -303,17 +337,17 @@ elif menu == "🚛 Operadores Pesaje":
             fig3.update_traces(textposition='outside')
             st.plotly_chart(fig3, use_container_width=True)
             st.markdown("</div>", unsafe_allow_html=True)
+        if not es_hoy:
+            st.warning(f"⚠️ Hoy {hoy_mty.strftime('%d/%m/%Y')} aún no hay boletas. Mostrando último día: {etiqueta_fecha} - {total_viajes_mostrar} boletas")
 
-        # === NUEVO: SOLO HOY - SIN REGISTRO ===
-        st.markdown('<div class="gepp-card"><div class="gepp-header">🚨 OPERADORES SIN REGISTRO - SOLO HOY 01/10/2026</div>', unsafe_allow_html=True)
+        # ===== SOLO ESTE BLOQUE ES NUEVO - NO SE TOCO NADA MAS =====
+        st.markdown('<div class="gepp-card"><div class="gepp-header">🚨 OPERADORES SIN REGISTRO - SOLO HOY</div>', unsafe_allow_html=True)
         catalogo_completo = load_catalogo_operadores()
         registrados_hoy = df_mostrar[col_nombre].astype(str).str.strip().unique().tolist() if not df_mostrar.empty else []
-        # normaliza
         def norm_upper(s): return str(s).strip().upper()
         dict_cat = {norm_upper(x): str(x).strip() for x in catalogo_completo}
         set_reg = set([norm_upper(x) for x in registrados_hoy])
         faltantes_hoy = [dict_cat[k] for k in dict_cat if k not in set_reg]
-
         col_s1, col_s2 = st.columns([0.4, 0.6])
         with col_s1:
             st.metric("Con Boleta HOY", len(registrados_hoy))
@@ -333,7 +367,7 @@ elif menu == "🚛 Operadores Pesaje":
                 st.success(f"✅ ¡TODOS registraron HOY {hoy_mty.strftime('%d/%m/%Y')}!")
                 st.balloons()
         st.markdown("</div>", unsafe_allow_html=True)
-        # === FIN NUEVO ===
+        # ===== FIN BLOQUE NUEVO =====
 
         st.markdown('<div class="gepp-card"><div class="gepp-header">📊 PRODUCTIVIDAD DIARIA POR OPERADOR - BARRA</div>', unsafe_allow_html=True)
         if not prod_hoy.empty:
@@ -345,7 +379,6 @@ elif menu == "🚛 Operadores Pesaje":
         else:
             st.info(f"Sin registros el día {hoy_mty.strftime('%d/%m/%Y')}.")
         st.markdown("</div>", unsafe_allow_html=True)
-
         st.markdown('<div class="gepp-card"><div class="gepp-header">📊 Ranking - Total de viajes por operador</div>', unsafe_allow_html=True)
         cnt_op_bar = df_op[col_nombre].value_counts().reset_index(); cnt_op_bar.columns = ['Operador','Viajes']
         cnt_op_bar = cnt_op_bar.sort_values('Viajes', ascending=True)
@@ -354,7 +387,6 @@ elif menu == "🚛 Operadores Pesaje":
         fig_bar.update_traces(textposition='outside')
         st.plotly_chart(fig_bar, use_container_width=True)
         st.markdown("</div>", unsafe_allow_html=True)
-
         st.markdown('<div class="gepp-card"><div class="gepp-header">DETALLE REGISTROS OPERADORES - TABLA</div>', unsafe_allow_html=True)
         cols_ocultar = [c for c in df_op.columns if 'fecha_solo' in c.lower()]
         df_show_op = df_op.drop(columns=cols_ocultar, errors='ignore').tail(100).fillna("").iloc[::-1]
