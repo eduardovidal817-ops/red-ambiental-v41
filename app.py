@@ -4,6 +4,10 @@ import plotly.graph_objects as go
 import plotly.express as px
 import streamlit.components.v1 as components
 import requests, base64
+from datetime import datetime
+import pytz
+
+TZ_MEXICO = pytz.timezone("America/Monterrey")
 
 st.set_page_config(page_title="Red Ambiental - V44.1 Fix", layout="wide", page_icon="♻️")
 
@@ -37,7 +41,6 @@ def load():
     df.columns = df.columns.str.strip()
     df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
     if 'Estatus Entrega' in df.columns: df = df.drop(columns=['Estatus Entrega'])
-    # CORREGIDO: QUITE BASE GARCIA DEL MAPA WE
     mapa = {"BAXTER": "Eduardo Vidal","POLOMEX": "Felix Najera","AMAZON MTY1": "Felix Najera","AMAZON MTY2": "Felix Najera","AMAZON MTY3": "Felix Najera","JUEGOS DEL VALLE": "Felix Najera","CELESTICA": "Felix Najera","CATERPILLAR CIENEGA": "Sergio Llanes"}
     def get_coord(r):
         c = str(r.get("Coordinador","")).strip()
@@ -45,12 +48,39 @@ def load():
         return mapa.get(str(r.get("Planta","")).upper().strip(), "SIN ASIGNAR")
     if "Coordinador" not in df.columns: df["Coordinador"] = ""
     df["Coordinador"] = df.apply(get_coord, axis=1)
+    # FIX HORA GARCIA -6H
+    for col_fix in ["Hora Entrada", "Hora Salida"]:
+        if col_fix in df.columns:
+            try:
+                s = pd.to_datetime(df[col_fix], errors='coerce', utc=True)
+                if s.notna().any():
+                    s = s.dt.tz_convert(TZ_MEXICO).dt.tz_localize(None)
+                    df[col_fix] = s.dt.strftime('%I:%M:%S %p')
+                else:
+                    s2 = pd.to_datetime(df[col_fix], errors='coerce')
+                    df[col_fix] = (s2 - pd.Timedelta(hours=6)).dt.strftime('%I:%M:%S %p')
+            except:
+                pass
     return df
 
 @st.cache_data(ttl=30)
 def load_operadores():
     df = pd.read_csv(URL_OP_CSV)
     df.columns = df.columns.str.strip()
+    # FIX FECHA OPERADORES A HORA GARCIA
+    col_time = None
+    for c in df.columns:
+        if 'marca' in c.lower() or 'timestamp' in c.lower() or 'fecha' in c.lower():
+            col_time = c
+            break
+    if col_time:
+        try:
+            s = pd.to_datetime(df[col_time], errors='coerce', utc=True, dayfirst=True)
+            if s.notna().any():
+                s_mex = s.dt.tz_convert(TZ_MEXICO).dt.tz_localize(None)
+                df[col_time] = s_mex.dt.strftime('%d/%m/%Y %I:%M:%S %p')
+        except:
+            pass
     return df
 
 df_full = load()
@@ -129,7 +159,6 @@ if menu == "📊 Dashboard Asistencias":
                 else: mask = mask | df[col].astype(str).str.upper().str.contains(busq, na=False)
         if isinstance(mask, pd.Series):
             df = df[mask]; total = len(df); dentro = (df['¿Dentro?_NORM']=='DENTRO').sum(); fuera = total - dentro
-    # DONAS MAS CHICAS - height 260 we
     c1,c2,c3,c4 = st.columns([0.9,1.1,1.1,1.1])
     with c1:
         pct = (dentro/total*100) if total>0 else 0
@@ -246,11 +275,46 @@ elif menu == "🚛 Operadores Pesaje":
         col_nombre = [c for c in df_op.columns if 'nombre' in c.lower()][0]
         col_unidad = [c for c in df_op.columns if 'unidad' in c.lower()][0]
         col_base = [c for c in df_op.columns if 'base' in c.lower()][0]
+
+        # PRODUCTIVIDAD - META 3 VIAJES
+        META_DIARIA = 3
+        col_fecha = None
+        for c in df_op.columns:
+            if 'marca' in c.lower() or 'timestamp' in c.lower() or 'fecha' in c.lower():
+                col_fecha = c; break
+
+        hoy_mty = datetime.now(TZ_MEXICO).date()
+        # Intenta sacar fecha solo
+        try:
+            df_op['fecha_solo_dt'] = pd.to_datetime(df_op[col_fecha], errors='coerce', dayfirst=True, utc=True).dt.tz_convert(TZ_MEXICO)
+            df_op['fecha_solo'] = df_op['fecha_solo_dt'].dt.date
+        except:
+            df_op['fecha_solo'] = hoy_mty
+
+        df_hoy = df_op[df_op['fecha_solo'] == hoy_mty].copy() if 'fecha_solo' in df_op.columns else pd.DataFrame()
+
+        if not df_hoy.empty:
+            prod_hoy = df_hoy[col_nombre].value_counts().reset_index()
+            prod_hoy.columns = ['Operador','Viajes_Hoy']
+            prod_hoy['Productividad_%'] = (prod_hoy['Viajes_Hoy'] / META_DIARIA * 100).round(1)
+            prod_hoy = prod_hoy.sort_values('Productividad_%', ascending=True)
+            total_viajes_hoy = len(df_hoy)
+            ops_hoy = prod_hoy.shape[0]
+            prod_prom = (total_viajes_hoy / (ops_hoy * META_DIARIA) * 100) if ops_hoy>0 else 0
+        else:
+            prod_hoy = pd.DataFrame()
+            total_viajes_hoy = 0
+            ops_hoy = 0
+            prod_prom = 0
+
         total_viajes = len(df_op)
         operadores_unicos = df_op[col_nombre].nunique()
+
         c1,c2,c3,c4 = st.columns([0.9,1.1,1.1,1.1])
         with c1:
-            st.markdown(f'<div class="gepp-card" style="background:#0f2a1a; color:white; padding:15px; height:260px; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center;"><p style="font-size:11px; color:#a0c4a8; font-weight:bold;">TOTAL VIAJES REGISTRADOS</p><p style="font-size:44px; font-weight:900; margin:15px 0;">{total_viajes}</p><p style="font-size:12px;">Operadores: {operadores_unicos}</p><div style="width:40px; height:40px; background:#00ff66; border-radius:50%; margin-top:10px;"></div></div>', unsafe_allow_html=True)
+            # CIRCULO DE PRODUCTIVIDAD - NUEVO
+            color_prod = "#00b050" if prod_prom>=100 else "#ffcc00" if prod_prom>=66 else "#ff0000"
+            st.markdown(f'<div class="gepp-card" style="background:#0f2a1a; color:white; padding:15px; height:260px; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center;"><p style="font-size:11px; color:#a0c4a8; font-weight:bold;">PRODUCTIVIDAD HOY<br>{hoy_mty.strftime("%d/%m/%Y")}</p><p style="font-size:42px; font-weight:900; margin:10px 0;">{prod_prom:.0f}%</p><p style="font-size:11px;">Meta 3 viajes = 100%<br>Hoy: {total_viajes_hoy} boletas / {ops_hoy} ops</p><div style="width:40px; height:40px; background:{color_prod}; border-radius:50%; margin-top:10px;"></div></div>', unsafe_allow_html=True)
         with c2:
             st.markdown('<div class="gepp-card"><div class="gepp-header">Viajes por Operador - Dona</div>', unsafe_allow_html=True)
             cnt_op = df_op[col_nombre].value_counts().reset_index(); cnt_op.columns = ['Operador','Viajes']
@@ -274,6 +338,19 @@ elif menu == "🚛 Operadores Pesaje":
             st.plotly_chart(fig3, use_container_width=True)
             st.markdown("</div>", unsafe_allow_html=True)
 
+        # BARRA DE PRODUCTIVIDAD
+        st.markdown('<div class="gepp-card"><div class="gepp-header">📊 PRODUCTIVIDAD DIARIA POR OPERADOR - META 3 VIAJES = 100% - HOY (BARRA)</div>', unsafe_allow_html=True)
+        if not prod_hoy.empty:
+            fig_prod = px.bar(prod_hoy, x='Productividad_%', y='Operador', orientation='h', text='Productividad_%', color='Productividad_%', color_continuous_scale=['#ff0000','#ffcc00','#00b050'], range_color=[0,150])
+            fig_prod.add_vline(x=100, line_dash="dash", line_color="green", annotation_text="100% = 3 viajes")
+            fig_prod.add_vline(x=133.3, line_dash="dot", line_color="orange", annotation_text="133% = 4 viajes")
+            fig_prod.update_layout(height=400, margin=dict(l=10,r=60,t=20,b=10), paper_bgcolor="white", plot_bgcolor="white", showlegend=False)
+            fig_prod.update_traces(texttemplate='%{text:.0f}% - %{customdata} viajes', customdata=prod_hoy['Viajes_Hoy'], textposition='outside')
+            st.plotly_chart(fig_prod, use_container_width=True)
+        else:
+            st.info(f"Sin boletas hoy {hoy_mty.strftime('%d/%m/%Y')} - Cuando suban boletas aquí verás la productividad we")
+        st.markdown("</div>", unsafe_allow_html=True)
+
         st.markdown('<div class="gepp-card"><div class="gepp-header">📊 Ranking - Cuantos viajes hizo cada operador</div>', unsafe_allow_html=True)
         cnt_op_bar = df_op[col_nombre].value_counts().reset_index(); cnt_op_bar.columns = ['Operador','Viajes']
         cnt_op_bar = cnt_op_bar.sort_values('Viajes', ascending=True)
@@ -283,7 +360,7 @@ elif menu == "🚛 Operadores Pesaje":
         st.plotly_chart(fig_bar, use_container_width=True)
         st.markdown("</div>", unsafe_allow_html=True)
 
-        st.markdown('<div class="gepp-card"><div class="gepp-header">DETALLE REGISTROS OPERADORES - TABLA ZEBRA</div>', unsafe_allow_html=True)
+        st.markdown('<div class="gepp-card"><div class="gepp-header">DETALLE REGISTROS OPERADORES - TABLA ZEBRA (HORA GARCIA)</div>', unsafe_allow_html=True)
         df_show_op = df_op.tail(100).fillna("").iloc[::-1]
         components.html(render_zebra(df_show_op, "500px"), height=540, scrolling=True)
         st.markdown("</div>", unsafe_allow_html=True)
