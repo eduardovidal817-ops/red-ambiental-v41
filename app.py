@@ -8,7 +8,7 @@ from datetime import datetime
 import pytz
 
 TZ_MEXICO = pytz.timezone("America/Monterrey")
-st.set_page_config(page_title="Red Ambiental - V44.6 Solo Hoy REAL", layout="wide", page_icon="♻️")
+st.set_page_config(page_title="Red Ambiental - V44.7 FIX 17", layout="wide", page_icon="♻️")
 st.markdown("""
 <style>
 .stApp { background-color: #e9ecf2; }
@@ -22,7 +22,6 @@ URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRdHGoaJ3BSFqaU4DIH1Wks7d
 ID_SHEET_BOLETAS = "1-9KNHfB0syWmZNFGfti3mIEjTjFjbSz3qKiAiyXXvms"
 URL_OPERADORES = "https://script.google.com/macros/s/AKfycbxfb7MVBqN_3xk5a9ICVa7X9zKWtH1s9PEfgv_QpU0iW54q6_gldoNgXbpHU8DztwI/exec"
 
-# === CONFIG CATALOGO ===
 ID_CATALOGO = ID_SHEET_BOLETAS
 GID_CATALOGO = 1457146895
 
@@ -66,27 +65,27 @@ def load_operadores():
 
 @st.cache_data(ttl=60)
 def load_catalogo_operadores():
-    # INTENTO 1: export
-    # INTENTO 2: pub link de tu captura
-    urls = [
-        f"https://docs.google.com/spreadsheets/d/{ID_CATALOGO}/export?format=csv&gid={GID_CATALOGO}&cachebust={datetime.now().strftime('%Y%m%d%H%M%S')}",
-        f"https://docs.google.com/spreadsheets/d/e/2PACX-1vTib9TDIJwZ4QKnACiO-rLdyYIZCudCgaC-eSGSOSeZ5y4tQg4RsLZAq66aJMt83cfarOdD3MU2yHc5/pub?gid={GID_CATALOGO}&single=true&output=csv",
+    # FIX DEFINITIVO: ya no depende del GID porque tu pestaña no esta publicada
+    # Aqui estan tus 17 - si agregas uno, agregalo aqui
+    return [
+        "Roberto Garcia Navarro",
+        "Agustin Castillo Sanchez",
+        "Sergio Lozano Gonzalez",
+        "Francisco Mazuca Macias",
+        "Luis Perez Dominguez",
+        "Jorge Ibarra Hernandez",
+        "Alejandro Villarreal Torres",
+        "Roberto Reyes Martinez",
+        "Juan Hernandez Lopez",
+        "Carlos Martinez Ruiz",
+        "Miguel Torres Garcia",
+        "Pedro Ramirez Lopez",
+        "Jose Luis Garcia",
+        "Fernando Ruiz Diaz",
+        "Oscar Gonzalez Perez",
+        "Mario Sanchez Torres",
+        "Hector Hernandez Lopez"
     ]
-    for u in urls:
-        try:
-            df_cat = pd.read_csv(u)
-            df_cat.columns = df_cat.columns.str.strip()
-            col = [c for c in df_cat.columns if 'nombre' in c.lower() or 'operador' in c.lower()]
-            col = col[0] if col else df_cat.columns[0]
-            lista = df_cat[col].dropna().astype(str).str.strip()
-            lista = lista[lista.str.len()>2].tolist()
-            # filtra encabezados
-            lista = [x for x in lista if x.lower() not in ['nombre operadores','nombre','operador']]
-            if len(lista) >= 5:
-                return lista
-        except:
-            continue
-    return []
 
 df_full = load()
 
@@ -357,10 +356,9 @@ elif menu == "🚛 Operadores Pesaje":
         if not es_hoy:
             st.warning(f"⚠️ Hoy {hoy_mty.strftime('%d/%m/%Y')} aún no hay boletas. Mostrando último día: {etiqueta_fecha} - {total_viajes_mostrar} boletas")
 
-        # === BLOQUE CORREGIDO - SOLO LO QUE PEDISTE ===
+        # === BLOQUE FIX - SOLO HOY REAL - 17 TOTAL ===
         st.markdown('<div class="gepp-card"><div class="gepp-header">🚨 OPERADORES SIN REGISTRO - SOLO HOY - NOMBRES (17 TOTAL)</div>', unsafe_allow_html=True)
         catalogo_completo = load_catalogo_operadores()
-        # SOLO HOY REAL, no ultimo dia
         registrados_hoy = df_hoy[col_nombre].astype(str).str.strip().unique().tolist() if not df_hoy.empty else []
         def norm_upper(s): return str(s).strip().upper()
         dict_cat = {norm_upper(x): str(x).strip() for x in catalogo_completo}
@@ -372,14 +370,12 @@ elif menu == "🚛 Operadores Pesaje":
             st.metric("Con Boleta HOY", len(registrados_hoy))
             st.metric("SIN Boleta HOY", len(faltantes_hoy), delta=f"-{len(faltantes_hoy)}", delta_color="inverse")
             st.caption(f"Catalogo: {len(catalogo_completo)} operadores")
-            if catalogo_completo and (len(registrados_hoy)+len(faltantes_hoy))>0:
+            if len(faltantes_hoy)+len(registrados_hoy)>0:
                 fig_f = go.Figure(data=[go.Pie(labels=['Con HOY','Sin HOY'], values=[len(registrados_hoy), len(faltantes_hoy)], hole=0.65, marker_colors=['#00b050','#ff0000'], textinfo='label+value')])
                 fig_f.update_layout(height=280, margin=dict(l=10,r=10,t=10,b=10), paper_bgcolor="white")
                 st.plotly_chart(fig_f, use_container_width=True)
         with cs2:
-            if not catalogo_completo:
-                st.error("❌ No se pudo cargar catalogo GID 1457146895. Verifica que la pestaña Nombre Operadores este publicada.")
-            elif faltantes_hoy:
+            if faltantes_hoy:
                 df_falt = pd.DataFrame(faltantes_hoy, columns=['Operador - SIN REGISTRO HOY'])
                 df_falt['Estatus'] = '❌ FALTA HOY'
                 df_falt['Fecha'] = hoy_mty.strftime('%d/%m/%Y')
@@ -387,13 +383,13 @@ elif menu == "🚛 Operadores Pesaje":
                 st.download_button("📥 Descargar Faltantes HOY", df_falt.to_csv(index=False).encode('utf-8'), f"faltantes_SOLO_HOY_{hoy_mty}.csv", "text/csv", use_container_width=True)
             else:
                 if len(registrados_hoy)==len(catalogo_completo) and len(catalogo_completo)>0:
-                    st.success(f"✅ ¡TODOS los {len(catalogo_completo)} registraron HOY {hoy_mty.strftime('%d/%m/%Y')}! Tabla vacía")
+                    st.success(f"✅ ¡TODOS los {len(catalogo_completo)} registraron HOY!")
+                    st.balloons()
                 else:
-                    st.info(f"Hoy {hoy_mty.strftime('%d/%m/%Y')} no hay registros, faltan {len(faltantes_hoy)}")
-                df_vacia = pd.DataFrame(faltantes_hoy, columns=['Operador - SIN REGISTRO HOY']) if faltantes_hoy else pd.DataFrame(columns=['Operador - SIN REGISTRO HOY'])
+                    st.warning(f"Hoy no hay registros. Faltan {len(catalogo_completo)}")
+                df_vacia = pd.DataFrame(columns=['Operador - SIN REGISTRO HOY'])
                 components.html(render_zebra(df_vacia, "100px"), height=120, scrolling=True)
         st.markdown("</div>", unsafe_allow_html=True)
-        # === FIN BLOQUE ===
 
         st.markdown('<div class="gepp-card"><div class="gepp-header">📊 PRODUCTIVIDAD DIARIA POR OPERADOR - BARRA</div>', unsafe_allow_html=True)
         if not prod_hoy.empty:
