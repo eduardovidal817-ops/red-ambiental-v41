@@ -6,9 +6,10 @@ import streamlit.components.v1 as components
 import requests, base64
 from datetime import datetime
 import pytz
+import unicodedata
 
 TZ_MEXICO = pytz.timezone("America/Monterrey")
-st.set_page_config(page_title="Red Ambiental - V44.8 12 Reales", layout="wide", page_icon="♻️")
+st.set_page_config(page_title="Red Ambiental - V44.9 FIX ACENTOS", layout="wide", page_icon="♻️")
 st.markdown("""
 <style>
 .stApp { background-color: #e9ecf2; }
@@ -348,21 +349,30 @@ elif menu == "🚛 Operadores Pesaje":
         if not es_hoy:
             st.warning(f"⚠️ Hoy {hoy_mty.strftime('%d/%m/%Y')} aún no hay boletas. Mostrando último día: {etiqueta_fecha} - {total_viajes_mostrar} boletas")
 
-        st.markdown('<div class="gepp-card"><div class="gepp-header">🚨 OPERADORES SIN REGISTRO - SOLO HOY - NOMBRES (12 REALES)</div>', unsafe_allow_html=True)
+        st.markdown('<div class="gepp-card"><div class="gepp-header">🚨 OPERADORES SIN REGISTRO - SOLO HOY - 12 REALES (FIX ACENTOS)</div>', unsafe_allow_html=True)
         catalogo_completo = load_catalogo_operadores()
         registrados_hoy = df_hoy[col_nombre].astype(str).str.strip().unique().tolist() if not df_hoy.empty else []
-        def norm_upper(s): return str(s).strip().upper()
+
+        def norm_upper(s):
+            s = str(s).strip()
+            s = ''.join(c for c in unicodedata.normalize('NFD', s) if unicodedata.category(c)!= 'Mn')
+            s = ' '.join(s.split())
+            return s.upper()
+
         dict_cat = {norm_upper(x): str(x).strip() for x in catalogo_completo}
         set_reg = set([norm_upper(x) for x in registrados_hoy])
         faltantes_hoy = [dict_cat[k] for k in dict_cat if k not in set_reg]
 
+        # FIX: conteo real interseccion
+        con_hoy_real = len([k for k in dict_cat if k in set_reg])
+
         cs1, cs2 = st.columns([0.35, 0.65])
         with cs1:
-            st.metric("Con Boleta HOY", len(registrados_hoy))
+            st.metric("Con Boleta HOY", con_hoy_real)
             st.metric("SIN Boleta HOY", len(faltantes_hoy), delta=f"-{len(faltantes_hoy)}", delta_color="inverse")
-            st.caption(f"Catalogo: {len(catalogo_completo)} operadores")
-            if len(faltantes_hoy)+len(registrados_hoy)>0:
-                fig_f = go.Figure(data=[go.Pie(labels=['Con HOY','Sin HOY'], values=[len(registrados_hoy), len(faltantes_hoy)], hole=0.65, marker_colors=['#00b050','#ff0000'], textinfo='label+value')])
+            st.caption(f"Catalogo: {len(catalogo_completo)} operadores | Registros hoy: {len(registrados_hoy)}")
+            if len(faltantes_hoy)+con_hoy_real>0:
+                fig_f = go.Figure(data=[go.Pie(labels=['Con HOY','Sin HOY'], values=[con_hoy_real, len(faltantes_hoy)], hole=0.65, marker_colors=['#00b050','#ff0000'], textinfo='label+value')])
                 fig_f.update_layout(height=280, margin=dict(l=10,r=10,t=10,b=10), paper_bgcolor="white")
                 st.plotly_chart(fig_f, use_container_width=True)
         with cs2:
@@ -373,11 +383,8 @@ elif menu == "🚛 Operadores Pesaje":
                 components.html(render_zebra(df_falt, "400px"), height=420, scrolling=True)
                 st.download_button("📥 Descargar Faltantes HOY", df_falt.to_csv(index=False).encode('utf-8'), f"faltantes_SOLO_HOY_{hoy_mty}.csv", "text/csv", use_container_width=True)
             else:
-                if len(registrados_hoy)==len(catalogo_completo) and len(catalogo_completo)>0:
-                    st.success(f"✅ ¡TODOS los {len(catalogo_completo)} registraron HOY!")
-                    st.balloons()
-                else:
-                    st.warning(f"Hoy no hay registros. Faltan {len(catalogo_completo)}")
+                st.success(f"✅ ¡TODOS los {len(catalogo_completo)} registraron HOY!")
+                st.balloons()
                 df_vacia = pd.DataFrame(columns=['Operador - SIN REGISTRO HOY'])
                 components.html(render_zebra(df_vacia, "100px"), height=120, scrolling=True)
         st.markdown("</div>", unsafe_allow_html=True)
