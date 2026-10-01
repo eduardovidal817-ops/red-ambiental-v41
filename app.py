@@ -300,10 +300,25 @@ elif menu == "🚛 Operadores Pesaje":
             ops_hoy = 0
             prod_prom = 0
 
+        # --- AQUI ESTA EL FIX, SOLO ESTE CUADRO CAMBIA A TOTALES ---
         c1,c2,c3,c4 = st.columns([0.9,1.1,1.1,1.1])
         with c1:
-            color_prod = "#00b050" if prod_prom>=100 else "#ffcc00" if prod_prom>=66 else "#ff0000"
-            st.markdown(f'<div class="gepp-card" style="background:#0f2a1a; color:white; padding:15px; height:260px; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center;"><p style="font-size:11px; color:#a0c4a8; font-weight:bold;">PRODUCTIVIDAD HOY<br>{hoy_mty.strftime("%d/%m/%Y")}</p><p style="font-size:42px; font-weight:900; margin:10px 0;">{prod_prom:.0f}%</p><p style="font-size:11px;">Meta 3 viajes = 100%<br>Hoy: {total_viajes_hoy} boletas / {ops_hoy} operadores</p><div style="width:40px; height:40px; background:{color_prod}; border-radius:50%; margin-top:10px;"></div></div>', unsafe_allow_html=True)
+            if total_viajes_hoy >= 3:
+                color_prod = "#00b050"
+            elif total_viajes_hoy >= 1:
+                color_prod = "#ffcc00"
+            else:
+                color_prod = "#ff0000"
+
+            st.markdown(f'''
+            <div class="gepp-card" style="background:#0f2a1a; color:white; padding:15px; height:260px; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center;">
+                <p style="font-size:11px; color:#a0c4a8; font-weight:bold;">TOTAL BOLETAS HOY<br>{hoy_mty.strftime("%d/%m/%Y")}</p>
+                <p style="font-size:52px; font-weight:900; margin:10px 0; line-height:1;">{total_viajes_hoy}</p>
+                <p style="font-size:13px; font-weight:bold; color:#00ff88;">BOLETAS</p>
+                <p style="font-size:11px; margin-top:5px;">Operadores: {ops_hoy}<br>Acumulado total: {len(df_op)}</p>
+                <div style="width:40px; height:40px; background:{color_prod}; border-radius:50%; margin-top:10px; border:2px solid white;"></div>
+            </div>
+            ''', unsafe_allow_html=True)
         with c2:
             st.markdown('<div class="gepp-card"><div class="gepp-header">Viajes por Operador - Dona</div>', unsafe_allow_html=True)
             cnt_op = df_op[col_nombre].value_counts().reset_index(); cnt_op.columns = ['Operador','Viajes']
