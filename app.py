@@ -8,9 +8,7 @@ from datetime import datetime
 import pytz
 
 TZ_MEXICO = pytz.timezone("America/Monterrey")
-
 st.set_page_config(page_title="Red Ambiental - V44.1 Fix", layout="wide", page_icon="♻️")
-
 st.markdown("""
 <style>
 .stApp { background-color: #e9ecf2; }
@@ -270,52 +268,51 @@ elif menu == "🚛 Operadores Pesaje":
         col_nombre = [c for c in df_op.columns if 'nombre' in c.lower()][0]
         col_unidad = [c for c in df_op.columns if 'unidad' in c.lower()][0]
         col_base = [c for c in df_op.columns if 'base' in c.lower()][0]
-
         META_DIARIA = 3
         col_fecha = None
         for c in df_op.columns:
             if 'marca' in c.lower() or 'timestamp' in c.lower() or 'fecha' in c.lower():
                 col_fecha = c; break
-
         hoy_mty = datetime.now(TZ_MEXICO).date()
         try:
-            df_op['fecha_solo_dt'] = pd.to_datetime(df_op[col_fecha], errors='coerce', dayfirst=True, utc=True).dt.tz_convert(TZ_MEXICO)
+            df_op['fecha_solo_dt'] = pd.to_datetime(df_op[col_fecha], errors='coerce', dayfirst=True)
             df_op['fecha_solo'] = df_op['fecha_solo_dt'].dt.date
+            df_op['fecha_solo'] = df_op['fecha_solo'].fillna(hoy_mty)
         except:
             df_op['fecha_solo'] = hoy_mty
-
         df_hoy = df_op[df_op['fecha_solo'] == hoy_mty].copy() if 'fecha_solo' in df_op.columns else pd.DataFrame()
-
         if not df_hoy.empty:
-            prod_hoy = df_hoy[col_nombre].value_counts().reset_index()
+            fecha_mostrar = hoy_mty
+            df_mostrar = df_hoy
+            etiqueta_fecha = f"{hoy_mty.strftime('%d/%m/%Y')} - HOY"
+        else:
+            if not df_op.empty and df_op['fecha_solo'].notna().any():
+                ultima_fecha = df_op['fecha_solo'].max()
+                df_mostrar = df_op[df_op['fecha_solo'] == ultima_fecha].copy()
+                etiqueta_fecha = f"{ultima_fecha.strftime('%d/%m/%Y')} - ULTIMO DIA"
+            else:
+                df_mostrar = pd.DataFrame()
+                etiqueta_fecha = f"{hoy_mty.strftime('%d/%m/%Y')}"
+        if not df_mostrar.empty:
+            prod_hoy = df_mostrar[col_nombre].value_counts().reset_index()
             prod_hoy.columns = ['Operador','Viajes_Hoy']
             prod_hoy['Productividad_%'] = (prod_hoy['Viajes_Hoy'] / META_DIARIA * 100).round(1)
             prod_hoy = prod_hoy.sort_values('Productividad_%', ascending=True)
-            total_viajes_hoy = len(df_hoy)
+            total_viajes_mostrar = len(df_mostrar)
             ops_hoy = prod_hoy.shape[0]
-            prod_prom = (total_viajes_hoy / (ops_hoy * META_DIARIA) * 100) if ops_hoy>0 else 0
         else:
             prod_hoy = pd.DataFrame()
-            total_viajes_hoy = 0
+            total_viajes_mostrar = 0
             ops_hoy = 0
-            prod_prom = 0
-
-        # --- AQUI ESTA EL FIX, SOLO ESTE CUADRO CAMBIA A TOTALES ---
         c1,c2,c3,c4 = st.columns([0.9,1.1,1.1,1.1])
         with c1:
-            if total_viajes_hoy >= 3:
-                color_prod = "#00b050"
-            elif total_viajes_hoy >= 1:
-                color_prod = "#ffcc00"
-            else:
-                color_prod = "#ff0000"
-
+            color_prod = "#00b050" if total_viajes_mostrar>=3 else "#ffcc00" if total_viajes_mostrar>=1 else "#ff0000"
             st.markdown(f'''
             <div class="gepp-card" style="background:#0f2a1a; color:white; padding:15px; height:260px; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center;">
-                <p style="font-size:11px; color:#a0c4a8; font-weight:bold;">TOTAL BOLETAS HOY<br>{hoy_mty.strftime("%d/%m/%Y")}</p>
-                <p style="font-size:52px; font-weight:900; margin:10px 0; line-height:1;">{total_viajes_hoy}</p>
+                <p style="font-size:11px; color:#a0c4a8; font-weight:bold;">TOTAL BOLETAS<br>{etiqueta_fecha}</p>
+                <p style="font-size:52px; font-weight:900; margin:10px 0; line-height:1;">{total_viajes_mostrar}</p>
                 <p style="font-size:13px; font-weight:bold; color:#00ff88;">BOLETAS</p>
-                <p style="font-size:11px; margin-top:5px;">Operadores: {ops_hoy}<br>Acumulado total: {len(df_op)}</p>
+                <p style="font-size:11px; margin-top:5px;">Operadores: {ops_hoy}<br>Acumulado: {len(df_op)}</p>
                 <div style="width:40px; height:40px; background:{color_prod}; border-radius:50%; margin-top:10px; border:2px solid white;"></div>
             </div>
             ''', unsafe_allow_html=True)
@@ -341,19 +338,16 @@ elif menu == "🚛 Operadores Pesaje":
             fig3.update_traces(textposition='outside')
             st.plotly_chart(fig3, use_container_width=True)
             st.markdown("</div>", unsafe_allow_html=True)
-
-        st.markdown('<div class="gepp-card"><div class="gepp-header">📊 PRODUCTIVIDAD DIARIA POR OPERADOR - META 3 VIAJES = 100% - HOY (BARRA)</div>', unsafe_allow_html=True)
+        st.markdown('<div class="gepp-card"><div class="gepp-header">📊 PRODUCTIVIDAD DIARIA POR OPERADOR - BARRA</div>', unsafe_allow_html=True)
         if not prod_hoy.empty:
             fig_prod = px.bar(prod_hoy, x='Productividad_%', y='Operador', orientation='h', text='Productividad_%', color='Productividad_%', color_continuous_scale=['#ff0000','#ffcc00','#00b050'], range_color=[0,150])
             fig_prod.add_vline(x=100, line_dash="dash", line_color="green", annotation_text="100% = 3 viajes")
-            fig_prod.add_vline(x=133.3, line_dash="dot", line_color="orange", annotation_text="133% = 4 viajes")
             fig_prod.update_layout(height=400, margin=dict(l=10,r=60,t=20,b=10), paper_bgcolor="white", plot_bgcolor="white", showlegend=False)
             fig_prod.update_traces(texttemplate='%{text:.0f}% - %{customdata} viajes', customdata=prod_hoy['Viajes_Hoy'], textposition='outside')
             st.plotly_chart(fig_prod, use_container_width=True)
         else:
-            st.info(f"Sin registros el día {hoy_mty.strftime('%d/%m/%Y')}. La productividad se mostrará al registrar boletas.")
+            st.info(f"Sin registros el día {hoy_mty.strftime('%d/%m/%Y')}.")
         st.markdown("</div>", unsafe_allow_html=True)
-
         st.markdown('<div class="gepp-card"><div class="gepp-header">📊 Ranking - Total de viajes por operador</div>', unsafe_allow_html=True)
         cnt_op_bar = df_op[col_nombre].value_counts().reset_index(); cnt_op_bar.columns = ['Operador','Viajes']
         cnt_op_bar = cnt_op_bar.sort_values('Viajes', ascending=True)
@@ -362,7 +356,6 @@ elif menu == "🚛 Operadores Pesaje":
         fig_bar.update_traces(textposition='outside')
         st.plotly_chart(fig_bar, use_container_width=True)
         st.markdown("</div>", unsafe_allow_html=True)
-
         st.markdown('<div class="gepp-card"><div class="gepp-header">DETALLE REGISTROS OPERADORES - TABLA</div>', unsafe_allow_html=True)
         cols_ocultar = [c for c in df_op.columns if 'fecha_solo' in c.lower()]
         df_show_op = df_op.drop(columns=cols_ocultar, errors='ignore').tail(100).fillna("").iloc[::-1]
