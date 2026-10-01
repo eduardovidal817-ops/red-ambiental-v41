@@ -349,22 +349,34 @@ elif menu == "🚛 Operadores Pesaje":
         if not es_hoy:
             st.warning(f"⚠️ Hoy {hoy_mty.strftime('%d/%m/%Y')} aún no hay boletas. Mostrando último día: {etiqueta_fecha} - {total_viajes_mostrar} boletas")
 
-        st.markdown('<div class="gepp-card"><div class="gepp-header">🚨 OPERADORES SIN REGISTRO - SOLO HOY - 12 REALES (FIX ACENTOS)</div>', unsafe_allow_html=True)
+        # BLOQUE FIX FUZZY - SOLO ESTO CAMBIA
+        st.markdown('<div class="gepp-card"><div class="gepp-header">🚨 OPERADORES SIN REGISTRO - SOLO HOY - 12 REALES (FIX FUZZY CARLOS)</div>', unsafe_allow_html=True)
         catalogo_completo = load_catalogo_operadores()
         registrados_hoy = df_hoy[col_nombre].astype(str).str.strip().unique().tolist() if not df_hoy.empty else []
 
-        def norm_upper(s):
+        def norm(s):
             s = str(s).strip()
             s = ''.join(c for c in unicodedata.normalize('NFD', s) if unicodedata.category(c)!= 'Mn')
-            s = ' '.join(s.split())
-            return s.upper()
+            s = ' '.join(s.split()).upper()
+            return s
 
-        dict_cat = {norm_upper(x): str(x).strip() for x in catalogo_completo}
-        set_reg = set([norm_upper(x) for x in registrados_hoy])
-        faltantes_hoy = [dict_cat[k] for k in dict_cat if k not in set_reg]
+        def es_mismo(reg, cat):
+            r = norm(reg)
+            c = norm(cat)
+            if r == c: return True
+            if r in c or c in r: return True
+            pr = r.split()
+            pc = c.split()
+            if len(pr)>=2 and len(pc)>=2 and pr[0]==pc[0] and pr[1]==pc[1]:
+                return True
+            return False
 
-        # FIX: conteo real interseccion
-        con_hoy_real = len([k for k in dict_cat if k in set_reg])
+        faltantes_hoy = []
+        for cat in catalogo_completo:
+            if not any(es_mismo(reg, cat) for reg in registrados_hoy):
+                faltantes_hoy.append(cat)
+
+        con_hoy_real = len(catalogo_completo) - len(faltantes_hoy)
 
         cs1, cs2 = st.columns([0.35, 0.65])
         with cs1:
