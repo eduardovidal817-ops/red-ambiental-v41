@@ -8,7 +8,7 @@ from datetime import datetime
 import pytz
 
 TZ_MEXICO = pytz.timezone("America/Monterrey")
-st.set_page_config(page_title="Red Ambiental - V44.7 FIX 17", layout="wide", page_icon="♻️")
+st.set_page_config(page_title="Red Ambiental - V44.8 12 Reales", layout="wide", page_icon="♻️")
 st.markdown("""
 <style>
 .stApp { background-color: #e9ecf2; }
@@ -21,7 +21,6 @@ section[data-testid="stSidebar"] { background-color: #0a2211; }
 URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRdHGoaJ3BSFqaU4DIH1Wks7dROyzp3z7Z_guIBoAD7VzSXCIis14R9HMPCaDmF3omEK5RzEDlua1aR/pub?gid=1011674108&single=true&output=csv"
 ID_SHEET_BOLETAS = "1-9KNHfB0syWmZNFGfti3mIEjTjFjbSz3qKiAiyXXvms"
 URL_OPERADORES = "https://script.google.com/macros/s/AKfycbxfb7MVBqN_3xk5a9ICVa7X9zKWtH1s9PEfgv_QpU0iW54q6_gldoNgXbpHU8DztwI/exec"
-
 ID_CATALOGO = ID_SHEET_BOLETAS
 GID_CATALOGO = 1457146895
 
@@ -65,26 +64,19 @@ def load_operadores():
 
 @st.cache_data(ttl=60)
 def load_catalogo_operadores():
-    # FIX DEFINITIVO: ya no depende del GID porque tu pestaña no esta publicada
-    # Aqui estan tus 17 - si agregas uno, agregalo aqui
     return [
-        "Roberto Garcia Navarro",
         "Agustin Castillo Sanchez",
         "Sergio Lozano Gonzalez",
+        "Jorge Ibarra Serrato",
+        "Alejandro Villarreal Bustamante",
+        "Roberto Reyes Alanis",
+        "Juan Estrada Guerra",
+        "Luis Pérez Dominguez",
+        "Roberto Garcia Navarro",
+        "Ricardo Cazares Diaz",
+        "Carlos Garcia Macias",
         "Francisco Mazuca Macias",
-        "Luis Perez Dominguez",
-        "Jorge Ibarra Hernandez",
-        "Alejandro Villarreal Torres",
-        "Roberto Reyes Martinez",
-        "Juan Hernandez Lopez",
-        "Carlos Martinez Ruiz",
-        "Miguel Torres Garcia",
-        "Pedro Ramirez Lopez",
-        "Jose Luis Garcia",
-        "Fernando Ruiz Diaz",
-        "Oscar Gonzalez Perez",
-        "Mario Sanchez Torres",
-        "Hector Hernandez Lopez"
+        "Kevin Rodriguez Lopez"
     ]
 
 df_full = load()
@@ -356,8 +348,7 @@ elif menu == "🚛 Operadores Pesaje":
         if not es_hoy:
             st.warning(f"⚠️ Hoy {hoy_mty.strftime('%d/%m/%Y')} aún no hay boletas. Mostrando último día: {etiqueta_fecha} - {total_viajes_mostrar} boletas")
 
-        # === BLOQUE FIX - SOLO HOY REAL - 17 TOTAL ===
-        st.markdown('<div class="gepp-card"><div class="gepp-header">🚨 OPERADORES SIN REGISTRO - SOLO HOY - NOMBRES (17 TOTAL)</div>', unsafe_allow_html=True)
+        st.markdown('<div class="gepp-card"><div class="gepp-header">🚨 OPERADORES SIN REGISTRO - SOLO HOY - NOMBRES (12 REALES)</div>', unsafe_allow_html=True)
         catalogo_completo = load_catalogo_operadores()
         registrados_hoy = df_hoy[col_nombre].astype(str).str.strip().unique().tolist() if not df_hoy.empty else []
         def norm_upper(s): return str(s).strip().upper()
