@@ -58,8 +58,7 @@ def load():
                 else:
                     s2 = pd.to_datetime(df[col_fix], errors='coerce')
                     df[col_fix] = (s2 - pd.Timedelta(hours=6)).dt.strftime('%I:%M:%S %p')
-            except:
-                pass
+            except: pass
     return df
 
 @st.cache_data(ttl=30)
@@ -69,16 +68,14 @@ def load_operadores():
     col_time = None
     for c in df.columns:
         if 'marca' in c.lower() or 'timestamp' in c.lower() or 'fecha' in c.lower():
-            col_time = c
-            break
+            col_time = c; break
     if col_time:
         try:
             s = pd.to_datetime(df[col_time], errors='coerce', utc=True, dayfirst=True)
             if s.notna().any():
                 s_mex = s.dt.tz_convert(TZ_MEXICO).dt.tz_localize(None)
                 df[col_time] = s_mex.dt.strftime('%d/%m/%Y %I:%M:%S %p')
-        except:
-            pass
+        except: pass
     return df
 
 df_full = load()
@@ -352,7 +349,6 @@ elif menu == "🚛 Operadores Pesaje":
         st.markdown("</div>", unsafe_allow_html=True)
 
         st.markdown('<div class="gepp-card"><div class="gepp-header">DETALLE REGISTROS OPERADORES - TABLA</div>', unsafe_allow_html=True)
-        # Oculta columnas internas de productividad
         cols_ocultar = [c for c in df_op.columns if 'fecha_solo' in c.lower()]
         df_show_op = df_op.drop(columns=cols_ocultar, errors='ignore').tail(100).fillna("").iloc[::-1]
         components.html(render_zebra(df_show_op, "500px"), height=540, scrolling=True)
