@@ -15,22 +15,11 @@ st.markdown("""
 section[data-testid="stSidebar"] { background-color: #0a2211; }
 .gepp-card { background:white; border:1px solid #b0b8c8; border-radius:6px; overflow:hidden; margin-bottom:8px; box-shadow:0 1px 3px rgba(0,0,0,0.1); }
 .gepp-header { background:#0f3d1f; color:white; padding:6px 12px; font-size:11px; font-weight:700; text-align:center; text-transform:uppercase; }
-.zebra-table { width:100%; border-collapse:collapse; font-size:12px; font-family:Arial; }
-.zebra-table th { background:#0f3d1f; color:white; padding:8px; text-align:left; position:sticky; top:0; }
-.zebra-table td { padding:7px 8px; border-bottom:1px solid #e0e0e0; }
-.zebra-table tr:nth-child(even) { background:#f2f4f7; }
-.zebra-table tr:nth-child(odd) { background:#ffffff; }
-.zebra-table tr:hover { background:#d1e7dd!important; }
-.badge-dentro { background:#00b050; color:white; padding:2px 6px; border-radius:10px; font-weight:bold; font-size:10px; }
-.badge-fuera { background:#ff0000; color:white; padding:2px 6px; border-radius:10px; font-weight:bold; font-size:10px; }
-.badge-excelente { background:#00b050; color:white; padding:2px 6px; border-radius:10px; font-weight:bold; font-size:10px; }
-.badge-bueno { background:#ffcc00; color:black; padding:2px 6px; border-radius:10px; font-weight:bold; font-size:10px; }
-.badge-malo { background:#ff0000; color:white; padding:2px 6px; border-radius:10px; font-weight:bold; font-size:10px; }
 </style>
 """, unsafe_allow_html=True)
 
 URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRdHGoaJ3BSFqaU4DIH1Wks7dROyzp3z7Z_guIBoAD7VzSXCIis14R9HMPCaDmF3omEK5RzEDlua1aR/pub?gid=1011674108&single=true&output=csv"
-URL_OP_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTib9TDIJwZ4QKnACiO-rLdyYIZCudCgaC-eSGSOSeZ5y4tQg4RsLZAq66aJMt83cfarOdD3MU2yHc5/pub?gid=0&single=true&output=csv"
+ID_SHEET_BOLETAS = "1-9KNHfB0syWmZNFGfti3mIEjTjFjbSz3qKiAiyXXvms"
 URL_OPERADORES = "https://script.google.com/macros/s/AKfycbxfb7MVBqN_3xk5a9ICVa7X9zKWtH1s9PEfgv_QpU0iW54q6_gldoNgXbpHU8DztwI/exec"
 
 @st.cache_data(ttl=60)
@@ -59,21 +48,16 @@ def load():
             except: pass
     return df
 
-@st.cache_data(ttl=30)
+@st.cache_data(ttl=10)
 def load_operadores():
-    df = pd.read_csv(URL_OP_CSV)
+    base_url = f"https://docs.google.com/spreadsheets/d/{ID_SHEET_BOLETAS}/export?format=csv&gid=0"
+    url = base_url + f"&cachebust={datetime.now().strftime('%Y%m%d%H%M%S')}"
+    try:
+        df = pd.read_csv(url)
+    except:
+        fallback = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTib9TDIJwZ4QKnACiO-rLdyYIZCudCgaC-eSGSOSeZ5y4tQg4RsLZAq66aJMt83cfarOdD3MU2yHc5/pub?gid=0&single=true&output=csv"
+        df = pd.read_csv(fallback)
     df.columns = df.columns.str.strip()
-    col_time = None
-    for c in df.columns:
-        if 'marca' in c.lower() or 'timestamp' in c.lower() or 'fecha' in c.lower():
-            col_time = c; break
-    if col_time:
-        try:
-            s = pd.to_datetime(df[col_time], errors='coerce', utc=True, dayfirst=True)
-            if s.notna().any():
-                s_mex = s.dt.tz_convert(TZ_MEXICO).dt.tz_localize(None)
-                df[col_time] = s_mex.dt.strftime('%d/%m/%Y %I:%M:%S %p')
-        except: pass
     return df
 
 df_full = load()
@@ -276,23 +260,27 @@ elif menu == "🚛 Operadores Pesaje":
         hoy_mty = datetime.now(TZ_MEXICO).date()
         try:
             df_op['fecha_solo_dt'] = pd.to_datetime(df_op[col_fecha], errors='coerce', dayfirst=True)
+            if df_op['fecha_solo_dt'].isna().sum() > len(df_op)//2:
+                df_op['fecha_solo_dt'] = pd.to_datetime(df_op[col_fecha], errors='coerce', dayfirst=False)
             df_op['fecha_solo'] = df_op['fecha_solo_dt'].dt.date
             df_op['fecha_solo'] = df_op['fecha_solo'].fillna(hoy_mty)
         except:
             df_op['fecha_solo'] = hoy_mty
         df_hoy = df_op[df_op['fecha_solo'] == hoy_mty].copy() if 'fecha_solo' in df_op.columns else pd.DataFrame()
         if not df_hoy.empty:
-            fecha_mostrar = hoy_mty
             df_mostrar = df_hoy
             etiqueta_fecha = f"{hoy_mty.strftime('%d/%m/%Y')} - HOY"
+            es_hoy = True
         else:
             if not df_op.empty and df_op['fecha_solo'].notna().any():
                 ultima_fecha = df_op['fecha_solo'].max()
                 df_mostrar = df_op[df_op['fecha_solo'] == ultima_fecha].copy()
                 etiqueta_fecha = f"{ultima_fecha.strftime('%d/%m/%Y')} - ULTIMO DIA"
+                es_hoy = False
             else:
                 df_mostrar = pd.DataFrame()
-                etiqueta_fecha = f"{hoy_mty.strftime('%d/%m/%Y')}"
+                etiqueta_fecha = f"{hoy_mty.strftime('%d/%m/%Y')} - HOY"
+                es_hoy = True
         if not df_mostrar.empty:
             prod_hoy = df_mostrar[col_nombre].value_counts().reset_index()
             prod_hoy.columns = ['Operador','Viajes_Hoy']
@@ -338,6 +326,8 @@ elif menu == "🚛 Operadores Pesaje":
             fig3.update_traces(textposition='outside')
             st.plotly_chart(fig3, use_container_width=True)
             st.markdown("</div>", unsafe_allow_html=True)
+        if not es_hoy:
+            st.warning(f"⚠️ Hoy {hoy_mty.strftime('%d/%m/%Y')} aún no hay boletas. Mostrando último día: {etiqueta_fecha} - {total_viajes_mostrar} boletas")
         st.markdown('<div class="gepp-card"><div class="gepp-header">📊 PRODUCTIVIDAD DIARIA POR OPERADOR - BARRA</div>', unsafe_allow_html=True)
         if not prod_hoy.empty:
             fig_prod = px.bar(prod_hoy, x='Productividad_%', y='Operador', orientation='h', text='Productividad_%', color='Productividad_%', color_continuous_scale=['#ff0000','#ffcc00','#00b050'], range_color=[0,150])
@@ -363,6 +353,7 @@ elif menu == "🚛 Operadores Pesaje":
         st.markdown("</div>", unsafe_allow_html=True)
     except Exception as e:
         st.error(f"No fue posible cargar la información de operadores: {e}")
+        st.exception(e)
 else:
     st.title("⛽ Rendimiento de Combustible - Próximamente")
     st.info("Módulo en preparación")
