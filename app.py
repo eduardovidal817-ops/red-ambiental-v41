@@ -48,7 +48,6 @@ def load():
         return mapa.get(str(r.get("Planta","")).upper().strip(), "SIN ASIGNAR")
     if "Coordinador" not in df.columns: df["Coordinador"] = ""
     df["Coordinador"] = df.apply(get_coord, axis=1)
-    # FIX HORA GARCIA -6H
     for col_fix in ["Hora Entrada", "Hora Salida"]:
         if col_fix in df.columns:
             try:
@@ -67,7 +66,6 @@ def load():
 def load_operadores():
     df = pd.read_csv(URL_OP_CSV)
     df.columns = df.columns.str.strip()
-    # FIX FECHA OPERADORES A HORA GARCIA
     col_time = None
     for c in df.columns:
         if 'marca' in c.lower() or 'timestamp' in c.lower() or 'fecha' in c.lower():
@@ -261,14 +259,14 @@ elif menu == "🚛 Operadores Pesaje":
             foto = st.file_uploader("Foto Boleta", type=["jpg","jpeg","png"], key="op_f")
         if st.button("💾 Guardar Registro Operador", type="primary", use_container_width=True):
             if not nombre or not unidad or not base or not foto:
-                st.error("❌ Llena todo we")
+                st.error("❌ Complete todos los campos obligatorios")
             else:
-                with st.spinner("Subiendo..."):
+                with st.spinner("Procesando..."):
                     b64 = base64.b64encode(foto.getvalue()).decode('utf-8')
                     b64 = f"data:{foto.type};base64,{b64}"
                     payload = {"nombreCompleto": nombre, "unidad": unidad, "base": base, "foto": b64}
                     requests.post(URL_OPERADORES, json=payload, headers={"Content-Type":"text/plain;charset=utf-8"}, timeout=30)
-                    st.success("✅ Guardado con madre"); st.balloons()
+                    st.success("✅ Registro guardado correctamente"); st.balloons()
                     st.cache_data.clear()
     try:
         df_op = load_operadores()
@@ -276,7 +274,6 @@ elif menu == "🚛 Operadores Pesaje":
         col_unidad = [c for c in df_op.columns if 'unidad' in c.lower()][0]
         col_base = [c for c in df_op.columns if 'base' in c.lower()][0]
 
-        # PRODUCTIVIDAD - META 3 VIAJES
         META_DIARIA = 3
         col_fecha = None
         for c in df_op.columns:
@@ -284,7 +281,6 @@ elif menu == "🚛 Operadores Pesaje":
                 col_fecha = c; break
 
         hoy_mty = datetime.now(TZ_MEXICO).date()
-        # Intenta sacar fecha solo
         try:
             df_op['fecha_solo_dt'] = pd.to_datetime(df_op[col_fecha], errors='coerce', dayfirst=True, utc=True).dt.tz_convert(TZ_MEXICO)
             df_op['fecha_solo'] = df_op['fecha_solo_dt'].dt.date
@@ -307,14 +303,10 @@ elif menu == "🚛 Operadores Pesaje":
             ops_hoy = 0
             prod_prom = 0
 
-        total_viajes = len(df_op)
-        operadores_unicos = df_op[col_nombre].nunique()
-
         c1,c2,c3,c4 = st.columns([0.9,1.1,1.1,1.1])
         with c1:
-            # CIRCULO DE PRODUCTIVIDAD - NUEVO
             color_prod = "#00b050" if prod_prom>=100 else "#ffcc00" if prod_prom>=66 else "#ff0000"
-            st.markdown(f'<div class="gepp-card" style="background:#0f2a1a; color:white; padding:15px; height:260px; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center;"><p style="font-size:11px; color:#a0c4a8; font-weight:bold;">PRODUCTIVIDAD HOY<br>{hoy_mty.strftime("%d/%m/%Y")}</p><p style="font-size:42px; font-weight:900; margin:10px 0;">{prod_prom:.0f}%</p><p style="font-size:11px;">Meta 3 viajes = 100%<br>Hoy: {total_viajes_hoy} boletas / {ops_hoy} ops</p><div style="width:40px; height:40px; background:{color_prod}; border-radius:50%; margin-top:10px;"></div></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="gepp-card" style="background:#0f2a1a; color:white; padding:15px; height:260px; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center;"><p style="font-size:11px; color:#a0c4a8; font-weight:bold;">PRODUCTIVIDAD HOY<br>{hoy_mty.strftime("%d/%m/%Y")}</p><p style="font-size:42px; font-weight:900; margin:10px 0;">{prod_prom:.0f}%</p><p style="font-size:11px;">Meta 3 viajes = 100%<br>Hoy: {total_viajes_hoy} boletas / {ops_hoy} operadores</p><div style="width:40px; height:40px; background:{color_prod}; border-radius:50%; margin-top:10px;"></div></div>', unsafe_allow_html=True)
         with c2:
             st.markdown('<div class="gepp-card"><div class="gepp-header">Viajes por Operador - Dona</div>', unsafe_allow_html=True)
             cnt_op = df_op[col_nombre].value_counts().reset_index(); cnt_op.columns = ['Operador','Viajes']
@@ -338,7 +330,6 @@ elif menu == "🚛 Operadores Pesaje":
             st.plotly_chart(fig3, use_container_width=True)
             st.markdown("</div>", unsafe_allow_html=True)
 
-        # BARRA DE PRODUCTIVIDAD
         st.markdown('<div class="gepp-card"><div class="gepp-header">📊 PRODUCTIVIDAD DIARIA POR OPERADOR - META 3 VIAJES = 100% - HOY (BARRA)</div>', unsafe_allow_html=True)
         if not prod_hoy.empty:
             fig_prod = px.bar(prod_hoy, x='Productividad_%', y='Operador', orientation='h', text='Productividad_%', color='Productividad_%', color_continuous_scale=['#ff0000','#ffcc00','#00b050'], range_color=[0,150])
@@ -348,10 +339,10 @@ elif menu == "🚛 Operadores Pesaje":
             fig_prod.update_traces(texttemplate='%{text:.0f}% - %{customdata} viajes', customdata=prod_hoy['Viajes_Hoy'], textposition='outside')
             st.plotly_chart(fig_prod, use_container_width=True)
         else:
-            st.info(f"Sin boletas hoy {hoy_mty.strftime('%d/%m/%Y')} - Cuando suban boletas aquí verás la productividad we")
+            st.info(f"Sin registros el día {hoy_mty.strftime('%d/%m/%Y')}. La productividad se mostrará al registrar boletas.")
         st.markdown("</div>", unsafe_allow_html=True)
 
-        st.markdown('<div class="gepp-card"><div class="gepp-header">📊 Ranking - Cuantos viajes hizo cada operador</div>', unsafe_allow_html=True)
+        st.markdown('<div class="gepp-card"><div class="gepp-header">📊 Ranking - Total de viajes por operador</div>', unsafe_allow_html=True)
         cnt_op_bar = df_op[col_nombre].value_counts().reset_index(); cnt_op_bar.columns = ['Operador','Viajes']
         cnt_op_bar = cnt_op_bar.sort_values('Viajes', ascending=True)
         fig_bar = px.bar(cnt_op_bar, x='Viajes', y='Operador', orientation='h', text='Viajes', color='Viajes', color_continuous_scale='Greens')
@@ -360,12 +351,14 @@ elif menu == "🚛 Operadores Pesaje":
         st.plotly_chart(fig_bar, use_container_width=True)
         st.markdown("</div>", unsafe_allow_html=True)
 
-        st.markdown('<div class="gepp-card"><div class="gepp-header">DETALLE REGISTROS OPERADORES - TABLA ZEBRA (HORA GARCIA)</div>', unsafe_allow_html=True)
-        df_show_op = df_op.tail(100).fillna("").iloc[::-1]
+        st.markdown('<div class="gepp-card"><div class="gepp-header">DETALLE REGISTROS OPERADORES - TABLA</div>', unsafe_allow_html=True)
+        # Oculta columnas internas de productividad
+        cols_ocultar = [c for c in df_op.columns if 'fecha_solo' in c.lower()]
+        df_show_op = df_op.drop(columns=cols_ocultar, errors='ignore').tail(100).fillna("").iloc[::-1]
         components.html(render_zebra(df_show_op, "500px"), height=540, scrolling=True)
         st.markdown("</div>", unsafe_allow_html=True)
     except Exception as e:
-        st.error(f"No pude cargar operadores: {e}")
+        st.error(f"No fue posible cargar la información de operadores: {e}")
 else:
     st.title("⛽ Rendimiento de Combustible - Próximamente")
-    st.info("Módulo preparado we")
+    st.info("Módulo en preparación")
