@@ -22,9 +22,9 @@ URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRdHGoaJ3BSFqaU4DIH1Wks7d
 ID_SHEET_BOLETAS = "1-9KNHfB0syWmZNFGfti3mIEjTjFjbSz3qKiAiyXXvms"
 URL_OPERADORES = "https://script.google.com/macros/s/AKfycbxfb7MVBqN_3xk5a9ICVa7X9zKWtH1s9PEfgv_QpU0iW54q6_gldoNgXbpHU8DztwI/exec"
 
-# === CONFIG CATALOGO ===
+# === CONFIG CATALOGO - CORREGIDO DE TU FOTO ===
 ID_CATALOGO = ID_SHEET_BOLETAS
-GID_CATALOGO = 0 # Si tienes pestaña catalogo pon su gid, si es 0 usa historico
+GID_CATALOGO = 1457146895 # <- UNICO CAMBIO, antes tenias 0
 
 @st.cache_data(ttl=60)
 def load():
@@ -349,7 +349,6 @@ elif menu == "🚛 Operadores Pesaje":
         if not es_hoy:
             st.warning(f"⚠️ Hoy {hoy_mty.strftime('%d/%m/%Y')} aún no hay boletas. Mostrando último día: {etiqueta_fecha} - {total_viajes_mostrar} boletas")
 
-        # === SOLO ESTE BLOQUE ES NUEVO - OPERADORES SIN REGISTRO SOLO HOY CON NOMBRES ===
         st.markdown('<div class="gepp-card"><div class="gepp-header">🚨 OPERADORES SIN REGISTRO - SOLO HOY - NOMBRES</div>', unsafe_allow_html=True)
         catalogo_completo = load_catalogo_operadores()
         registrados_hoy = df_mostrar[col_nombre].astype(str).str.strip().unique().tolist() if not df_mostrar.empty else []
@@ -379,7 +378,6 @@ elif menu == "🚛 Operadores Pesaje":
                 components.html(render_zebra(df_vacia, "100px"), height=120, scrolling=True)
                 st.balloons()
         st.markdown("</div>", unsafe_allow_html=True)
-        # === FIN BLOQUE NUEVO ===
 
         st.markdown('<div class="gepp-card"><div class="gepp-header">📊 PRODUCTIVIDAD DIARIA POR OPERADOR - BARRA</div>', unsafe_allow_html=True)
         if not prod_hoy.empty:
