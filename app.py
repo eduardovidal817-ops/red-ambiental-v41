@@ -324,23 +324,27 @@ elif menu == "🚛 Operadores Pesaje":
                 <div style="width:40px; height:40px; background:{color_prod}; border-radius:50%; margin-top:10px; border:2px solid white;"></div>
             </div>
             ''', unsafe_allow_html=True)
+        # === FIX DONAS HOY ===
         with c2:
-            st.markdown('<div class="gepp-card"><div class="gepp-header">Viajes por Operador - Dona</div>', unsafe_allow_html=True)
-            cnt_op = df_op[col_nombre].value_counts().reset_index(); cnt_op.columns = ['Operador','Viajes']
-            fig = go.Figure(data=[go.Pie(labels=cnt_op['Operador'], values=cnt_op['Viajes'], hole=0.70, textinfo='percent', textposition='inside')])
+            st.markdown('<div class="gepp-card"><div class="gepp-header">Viajes por Operador - HOY - Dona</div>', unsafe_allow_html=True)
+            cnt_op = df_mostrar[col_nombre].value_counts().reset_index() if not df_mostrar.empty else pd.DataFrame(columns=['Operador','Viajes'])
+            cnt_op.columns = ['Operador','Viajes']
+            fig = go.Figure(data=[go.Pie(labels=cnt_op['Operador'], values=cnt_op['Viajes'], hole=0.70, textinfo='label+percent', textposition='inside')])
             fig.update_layout(height=260, margin=dict(l=10,r=10,t=10,b=10), paper_bgcolor="white", showlegend=True, legend=dict(orientation="h", y=-0.15, x=0.5, xanchor="center", font=dict(size=9)))
             st.plotly_chart(fig, use_container_width=True)
             st.markdown("</div>", unsafe_allow_html=True)
         with c3:
-            st.markdown('<div class="gepp-card"><div class="gepp-header">Viajes por Base - Dona</div>', unsafe_allow_html=True)
-            cnt_base = df_op[col_base].value_counts().reset_index(); cnt_base.columns = ['Base','Viajes']
+            st.markdown('<div class="gepp-card"><div class="gepp-header">Viajes por Base - HOY - Dona</div>', unsafe_allow_html=True)
+            cnt_base = df_mostrar[col_base].value_counts().reset_index() if not df_mostrar.empty else pd.DataFrame(columns=['Base','Viajes'])
+            cnt_base.columns = ['Base','Viajes']
             fig2 = go.Figure(data=[go.Pie(labels=cnt_base['Base'], values=cnt_base['Viajes'], hole=0.70, textinfo='label+percent', textposition='inside', marker=dict(colors=px.colors.sequential.Greens_r))])
             fig2.update_layout(height=260, margin=dict(l=10,r=10,t=10,b=10), paper_bgcolor="white", showlegend=False)
             st.plotly_chart(fig2, use_container_width=True)
             st.markdown("</div>", unsafe_allow_html=True)
         with c4:
-            st.markdown('<div class="gepp-card"><div class="gepp-header">Top Unidades</div>', unsafe_allow_html=True)
-            cnt_uni = df_op[col_unidad].value_counts().head(10).reset_index(); cnt_uni.columns = ['Unidad','Viajes']
+            st.markdown('<div class="gepp-card"><div class="gepp-header">Top Unidades HOY</div>', unsafe_allow_html=True)
+            cnt_uni = df_mostrar[col_unidad].value_counts().head(10).reset_index() if not df_mostrar.empty else pd.DataFrame(columns=['Unidad','Viajes'])
+            cnt_uni.columns = ['Unidad','Viajes']
             fig3 = px.bar(cnt_uni, x='Unidad', y='Viajes', text='Viajes', color='Viajes', color_continuous_scale='Greens')
             fig3.update_layout(height=260, margin=dict(l=10,r=10,t=10,b=30), paper_bgcolor="white", showlegend=False)
             fig3.update_traces(textposition='outside')
@@ -349,7 +353,6 @@ elif menu == "🚛 Operadores Pesaje":
         if not es_hoy:
             st.warning(f"⚠️ Hoy {hoy_mty.strftime('%d/%m/%Y')} aún no hay boletas. Mostrando último día: {etiqueta_fecha} - {total_viajes_mostrar} boletas")
 
-        # BLOQUE FIX FUZZY - SOLO ESTO CAMBIA
         st.markdown('<div class="gepp-card"><div class="gepp-header">🚨 OPERADORES SIN REGISTRO - SOLO HOY - 12 REALES (FIX FUZZY CARLOS)</div>', unsafe_allow_html=True)
         catalogo_completo = load_catalogo_operadores()
         registrados_hoy = df_hoy[col_nombre].astype(str).str.strip().unique().tolist() if not df_hoy.empty else []
