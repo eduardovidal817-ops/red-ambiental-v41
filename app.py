@@ -22,6 +22,8 @@ section[data-testid="stSidebar"] { background-color: #0a2211; }
 URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRdHGoaJ3BSFqaU4DIH1Wks7dROyzp3z7Z_guIBoAD7VzSXCIis14R9HMPCaDmF3omEK5RzEDlua1aR/pub?gid=1011674108&single=true&output=csv"
 ID_SHEET_BOLETAS = "1-9KNHfB0syWmZNFGfti3mIEjTjFjbSz3qKiAiyXXvms"
 URL_OPERADORES = "https://script.google.com/macros/s/AKfycbxfb7MVBqN_3xk5a9ICVa7X9zKWtH1s9PEfgv_QpU0iW54q6_gldoNgXbpHU8DztwI/exec"
+ID_CATALOGO = ID_SHEET_BOLETAS
+GID_CATALOGO = 1457146895
 
 @st.cache_data(ttl=60)
 def load():
@@ -110,19 +112,18 @@ with st.sidebar:
     st.markdown("---")
     if st.button("🔄 ACTUALIZAR TODO", type="primary", use_container_width=True):
         st.cache_data.clear(); st.rerun()
-
-if menu == "📊 Dashboard Asistencias":
     st.markdown("---")
-    df_full['Fecha_dt'] = pd.to_datetime(df_full['Fecha'], dayfirst=True, errors='coerce')
-    try:
-        min_f = df_full['Fecha_dt'].min().date(); max_f = df_full['Fecha_dt'].max().date()
-        fecha_sel = st.date_input("Fecha", value=(min_f, max_f))
-    except: fecha_sel = None
-    plantas = ["Todas"] + sorted(df_full["Planta"].dropna().astype(str).unique().tolist()) if "Planta" in df_full.columns else ["Todas"]
-    planta_sel = st.selectbox("Planta", plantas)
-    coords = ["Todos"] + sorted(df_full["Coordinador"].dropna().astype(str).unique().tolist()) if "Coordinador" in df_full.columns else ["Todos"]
-    coord_sel = st.selectbox("Coordinador", coords)
-    dentro_sel = st.selectbox("¿Dentro?", ["Todos","DENTRO","FUERA"])
+    if menu == "📊 Dashboard Asistencias":
+        df_full['Fecha_dt'] = pd.to_datetime(df_full['Fecha'], dayfirst=True, errors='coerce')
+        try:
+            min_f = df_full['Fecha_dt'].min().date(); max_f = df_full['Fecha_dt'].max().date()
+            fecha_sel = st.date_input("Fecha", value=(min_f, max_f))
+        except: fecha_sel = None
+        plantas = ["Todas"] + sorted(df_full["Planta"].dropna().astype(str).unique().tolist()) if "Planta" in df_full.columns else ["Todas"]
+        planta_sel = st.selectbox("Planta", plantas)
+        coords = ["Todos"] + sorted(df_full["Coordinador"].dropna().astype(str).unique().tolist()) if "Coordinador" in df_full.columns else ["Todos"]
+        coord_sel = st.selectbox("Coordinador", coords)
+        dentro_sel = st.selectbox("¿Dentro?", ["Todos","DENTRO","FUERA"])
 
 if menu == "📊 Dashboard Asistencias":
     df = df_full.copy()
@@ -286,40 +287,39 @@ elif menu == "🚛 Operadores Pesaje":
         except:
             df_op['fecha_solo'] = hoy_mty
 
-        # ===== FILTRO NUEVO POR DIA Y ACUMULADO =====
-        st.markdown('<div class="gepp-card"><div class="gepp-header">📅 FILTRO DE FECHAS - OPERADORES</div></div>', unsafe_allow_html=True)
-        fc1, fc2 = st.columns([1,2])
-        with fc1:
-            modo_vista = st.radio("Tipo de vista", ["Por Día", "Acumulado por Rango"], key="modo_vista_op")
-        with fc2:
+        # ===== FILTRO NUEVO SOLO PARA OPERADORES - NO TOCA ASISTENCIAS =====
+        st.markdown('<div class="gepp-card"><div class="gepp-header">📅 FILTRO OPERADORES - POR DIA / ACUMULADO</div></div>', unsafe_allow_html=True)
+        f1, f2 = st.columns([1,2])
+        with f1:
+            modo_vista = st.radio("Vista operadores", ["Por Día", "Acumulado por Rango"], key="modo_op_v2")
+        with f2:
             if modo_vista == "Por Día":
-                fechas = sorted(df_op['fecha_solo'].dropna().unique(), reverse=True)
-                fecha_sel = st.selectbox("Selecciona día", fechas, index=0)
-                df_mostrar = df_op[df_op['fecha_solo'] == fecha_sel].copy()
+                fechas_disp = sorted(df_op['fecha_solo'].dropna().unique(), reverse=True)
+                sel_dia = st.selectbox("Selecciona día", fechas_disp, index=0, key="sel_dia_op")
+                df_mostrar = df_op[df_op['fecha_solo'] == sel_dia].copy()
                 df_hoy = df_mostrar.copy()
-                etiqueta_fecha = fecha_sel.strftime('%d/%m/%Y')
-                es_hoy = (fecha_sel == hoy_mty)
+                etiqueta_fecha = sel_dia.strftime('%d/%m/%Y')
             else:
                 min_d = df_op['fecha_solo'].min()
                 max_d = df_op['fecha_solo'].max()
-                rango = st.date_input("Rango acumulado", value=(min_d, max_d))
+                rango = st.date_input("Rango acumulado", value=(min_d, max_d), key="rango_op_v2")
                 if isinstance(rango, tuple) and len(rango)==2:
                     f_ini, f_fin = rango
                     df_mostrar = df_op[(df_op['fecha_solo'] >= f_ini) & (df_op['fecha_solo'] <= f_fin)].copy()
                     ultima = df_mostrar['fecha_solo'].max() if not df_mostrar.empty else f_fin
                     df_hoy = df_op[df_op['fecha_solo'] == ultima].copy()
-                    etiqueta_fecha = f"{f_ini.strftime('%d/%m/%Y')} al {f_fin.strftime('%d/%m/%Y')}"
+                    etiqueta_fecha = f"{f_ini.strftime('%d/%m/%Y')} al {f_fin.strftime('%d/%m/%Y')} - ACUMULADO"
                 else:
                     df_mostrar = df_op.copy()
                     df_hoy = df_op[df_op['fecha_solo'] == df_op['fecha_solo'].max()].copy()
                     etiqueta_fecha = "TODO ACUMULADO"
-                es_hoy = False
 
         if not df_mostrar.empty:
             prod_hoy = df_mostrar[col_nombre].value_counts().reset_index()
             prod_hoy.columns = ['Operador','Viajes_Hoy']
             if modo_vista == "Acumulado por Rango":
                 dias = df_mostrar['fecha_solo'].nunique()
+                dias = dias if dias>0 else 1
                 prod_hoy['Productividad_%'] = ((prod_hoy['Viajes_Hoy']/dias)/META_DIARIA*100).round(1)
             else:
                 prod_hoy['Productividad_%'] = (prod_hoy['Viajes_Hoy']/META_DIARIA*100).round(1)
@@ -391,7 +391,7 @@ elif menu == "🚛 Operadores Pesaje":
         with cs1:
             st.metric("Con Boleta", con_hoy_real)
             st.metric("SIN Boleta", len(faltantes_hoy), delta=f"-{len(faltantes_hoy)}", delta_color="inverse")
-            st.caption(f"Catalogo: {len(catalogo_completo)} | Registros en filtro: {len(registrados_hoy)} | {etiqueta_fecha}")
+            st.caption(f"Catalogo: {len(catalogo_completo)} | En vista: {len(registrados_hoy)} | {etiqueta_fecha}")
             if len(faltantes_hoy)+con_hoy_real>0:
                 fig_f = go.Figure(data=[go.Pie(labels=['Con','Sin'], values=[con_hoy_real, len(faltantes_hoy)], hole=0.65, marker_colors=['#00b050','#ff0000'], textinfo='label+value')])
                 fig_f.update_layout(height=280, margin=dict(l=10,r=10,t=10,b=10), paper_bgcolor="white")
@@ -408,7 +408,7 @@ elif menu == "🚛 Operadores Pesaje":
                 st.balloons()
         st.markdown("</div>", unsafe_allow_html=True)
 
-        st.markdown(f'<div class="gepp-card"><div class="gepp-header">📊 PRODUCTIVIDAD {"DIARIA" if modo_vista=="Por Día" else "PROMEDIO DIARIO"} - {etiqueta_fecha}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="gepp-card"><div class="gepp-header">📊 PRODUCTIVIDAD - {etiqueta_fecha}</div>', unsafe_allow_html=True)
         if not prod_hoy.empty:
             fig_prod = px.bar(prod_hoy, x='Productividad_%', y='Operador', orientation='h', text='Productividad_%', color='Productividad_%', color_continuous_scale=['#ff0000','#ffcc00','#00b050'], range_color=[0,150])
             fig_prod.add_vline(x=100, line_dash="dash", line_color="green", annotation_text="100% = 3 viajes")
@@ -419,7 +419,7 @@ elif menu == "🚛 Operadores Pesaje":
             st.info(f"Sin registros en {etiqueta_fecha}.")
         st.markdown("</div>", unsafe_allow_html=True)
 
-        st.markdown('<div class="gepp-card"><div class="gepp-header">📊 Ranking - Total de viajes por operador - FILTRADO</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="gepp-card"><div class="gepp-header">📊 Ranking - {etiqueta_fecha}</div>', unsafe_allow_html=True)
         cnt_op_bar = df_mostrar[col_nombre].value_counts().reset_index() if not df_mostrar.empty else pd.DataFrame(columns=['Operador','Viajes'])
         cnt_op_bar.columns = ['Operador','Viajes']
         cnt_op_bar = cnt_op_bar.sort_values('Viajes', ascending=True)
