@@ -22,8 +22,6 @@ section[data-testid="stSidebar"] { background-color: #0a2211; }
 URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRdHGoaJ3BSFqaU4DIH1Wks7dROyzp3z7Z_guIBoAD7VzSXCIis14R9HMPCaDmF3omEK5RzEDlua1aR/pub?gid=1011674108&single=true&output=csv"
 ID_SHEET_BOLETAS = "1-9KNHfB0syWmZNFGfti3mIEjTjFjbSz3qKiAiyXXvms"
 URL_OPERADORES = "https://script.google.com/macros/s/AKfycbxfb7MVBqN_3xk5a9ICVa7X9zKWtH1s9PEfgv_QpU0iW54q6_gldoNgXbpHU8DztwI/exec"
-ID_CATALOGO = ID_SHEET_BOLETAS
-GID_CATALOGO = 1457146895
 
 @st.cache_data(ttl=60)
 def load():
@@ -287,7 +285,6 @@ elif menu == "🚛 Operadores Pesaje":
         except:
             df_op['fecha_solo'] = hoy_mty
 
-        # ===== FILTRO NUEVO SOLO PARA OPERADORES - NO TOCA ASISTENCIAS =====
         st.markdown('<div class="gepp-card"><div class="gepp-header">📅 FILTRO OPERADORES - POR DIA / ACUMULADO</div></div>', unsafe_allow_html=True)
         f1, f2 = st.columns([1,2])
         with f1:
@@ -299,6 +296,7 @@ elif menu == "🚛 Operadores Pesaje":
                 df_mostrar = df_op[df_op['fecha_solo'] == sel_dia].copy()
                 df_hoy = df_mostrar.copy()
                 etiqueta_fecha = sel_dia.strftime('%d/%m/%Y')
+                dias_filtro = 1
             else:
                 min_d = df_op['fecha_solo'].min()
                 max_d = df_op['fecha_solo'].max()
@@ -309,18 +307,28 @@ elif menu == "🚛 Operadores Pesaje":
                     ultima = df_mostrar['fecha_solo'].max() if not df_mostrar.empty else f_fin
                     df_hoy = df_op[df_op['fecha_solo'] == ultima].copy()
                     etiqueta_fecha = f"{f_ini.strftime('%d/%m/%Y')} al {f_fin.strftime('%d/%m/%Y')} - ACUMULADO"
+                    dias_filtro = (f_fin - f_ini).days + 1
                 else:
                     df_mostrar = df_op.copy()
                     df_hoy = df_op[df_op['fecha_solo'] == df_op['fecha_solo'].max()].copy()
                     etiqueta_fecha = "TODO ACUMULADO"
+                    dias_filtro = df_mostrar['fecha_solo'].nunique() if not df_mostrar.empty else 1
+
+        # === PRODUCTIVIDAD CON 11 FIJO ===
+        TOTAL_OPS_FIJO = 11
+        META_TOTAL_DIA_FIJO = TOTAL_OPS_FIJO * META_DIARIA # 33
+        if modo_vista == "Acumulado por Rango":
+            META_TOTAL_FILTRO = META_TOTAL_DIA_FIJO * dias_filtro
+        else:
+            META_TOTAL_FILTRO = META_TOTAL_DIA_FIJO
 
         if not df_mostrar.empty:
             prod_hoy = df_mostrar[col_nombre].value_counts().reset_index()
             prod_hoy.columns = ['Operador','Viajes_Hoy']
             if modo_vista == "Acumulado por Rango":
-                dias = df_mostrar['fecha_solo'].nunique()
-                dias = dias if dias>0 else 1
-                prod_hoy['Productividad_%'] = ((prod_hoy['Viajes_Hoy']/dias)/META_DIARIA*100).round(1)
+                dias_unicos = df_mostrar['fecha_solo'].nunique()
+                dias_unicos = dias_unicos if dias_unicos>0 else 1
+                prod_hoy['Productividad_%'] = ((prod_hoy['Viajes_Hoy']/dias_unicos)/META_DIARIA*100).round(1)
             else:
                 prod_hoy['Productividad_%'] = (prod_hoy['Viajes_Hoy']/META_DIARIA*100).round(1)
             prod_hoy = prod_hoy.sort_values('Productividad_%', ascending=True)
@@ -331,16 +339,22 @@ elif menu == "🚛 Operadores Pesaje":
             total_viajes_mostrar = 0
             ops_hoy = 0
 
+        productividad_global = (total_viajes_mostrar / META_TOTAL_FILTRO * 100) if META_TOTAL_FILTRO>0 else 0
+
+        # RECUADRO VERDE MAS GRANDE CON % GRANDE
         c1,c2,c3,c4 = st.columns([0.9,1.1,1.1,1.1])
         with c1:
-            color_prod = "#00b050" if total_viajes_mostrar>=3 else "#ffcc00" if total_viajes_mostrar>=1 else "#ff0000"
+            color_prod = "#00ff66" if productividad_global>=80 else "#ffcc00" if productividad_global>=40 else "#ff3333"
             st.markdown(f'''
-            <div class="gepp-card" style="background:#0f2a1a; color:white; padding:15px; height:260px; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center;">
-                <p style="font-size:11px; color:#a0c4a8; font-weight:bold;">TOTAL BOLETAS<br>{etiqueta_fecha}</p>
-                <p style="font-size:52px; font-weight:900; margin:10px 0; line-height:1;">{total_viajes_mostrar}</p>
-                <p style="font-size:13px; font-weight:bold; color:#00ff88;">BOLETAS</p>
-                <p style="font-size:11px; margin-top:5px;">Operadores: {ops_hoy}<br>Acumulado BD: {len(df_op)}</p>
-                <div style="width:40px; height:40px; background:{color_prod}; border-radius:50%; margin-top:10px; border:2px solid white;"></div>
+            <div class="gepp-card" style="background:#0a2211; color:white; padding:18px; height:380px; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center; border:2px solid #00ff88;">
+                <p style="font-size:12px; color:#a0c4a8; font-weight:bold; letter-spacing:1px;">TOTAL BOLETAS<br>{etiqueta_fecha}</p>
+                <p style="font-size:78px; font-weight:900; margin:8px 0 0 0; line-height:1;">{total_viajes_mostrar}</p>
+                <p style="font-size:14px; font-weight:bold; color:#00ff88; margin-top:2px;">BOLETAS</p>
+                <div style="width:100%; height:1px; background:#1a4d2e; margin:12px 0;"></div>
+                <p style="font-size:12px; color:#a0c4a8; font-weight:bold;">PRODUCTIVIDAD DEL DIA</p>
+                <p style="font-size:54px; font-weight:900; margin:4px 0; line-height:1; color:{color_prod};">{productividad_global:.2f}%</p>
+                <p style="font-size:11px; color:#d0d0d0; margin-top:4px;">Meta fija: {META_TOTAL_FILTRO} viajes (11 ops x 3{" x "+str(dias_filtro)+" días" if modo_vista!="Por Día" else ""})<br>{total_viajes_mostrar} / {META_TOTAL_FILTRO}</p>
+                <div style="width:50px; height:50px; background:{color_prod}; border-radius:50%; margin-top:10px; border:3px solid white; box-shadow:0 0 12px {color_prod};"></div>
             </div>
             ''', unsafe_allow_html=True)
         with c2:
@@ -348,7 +362,7 @@ elif menu == "🚛 Operadores Pesaje":
             cnt_op = df_mostrar[col_nombre].value_counts().reset_index() if not df_mostrar.empty else pd.DataFrame(columns=['Operador','Viajes'])
             cnt_op.columns = ['Operador','Viajes']
             fig = go.Figure(data=[go.Pie(labels=cnt_op['Operador'], values=cnt_op['Viajes'], hole=0.70, textinfo='label+percent', textposition='inside')])
-            fig.update_layout(height=260, margin=dict(l=10,r=10,t=10,b=10), paper_bgcolor="white", showlegend=True, legend=dict(orientation="h", y=-0.15, x=0.5, xanchor="center", font=dict(size=9)))
+            fig.update_layout(height=380, margin=dict(l=10,r=10,t=10,b=10), paper_bgcolor="white", showlegend=True, legend=dict(orientation="h", y=-0.15, x=0.5, xanchor="center", font=dict(size=9)))
             st.plotly_chart(fig, use_container_width=True)
             st.markdown("</div>", unsafe_allow_html=True)
         with c3:
@@ -356,7 +370,7 @@ elif menu == "🚛 Operadores Pesaje":
             cnt_base = df_mostrar[col_base].value_counts().reset_index() if not df_mostrar.empty else pd.DataFrame(columns=['Base','Viajes'])
             cnt_base.columns = ['Base','Viajes']
             fig2 = go.Figure(data=[go.Pie(labels=cnt_base['Base'], values=cnt_base['Viajes'], hole=0.70, textinfo='label+percent', textposition='inside', marker=dict(colors=px.colors.sequential.Greens_r))])
-            fig2.update_layout(height=260, margin=dict(l=10,r=10,t=10,b=10), paper_bgcolor="white", showlegend=False)
+            fig2.update_layout(height=380, margin=dict(l=10,r=10,t=10,b=10), paper_bgcolor="white", showlegend=False)
             st.plotly_chart(fig2, use_container_width=True)
             st.markdown("</div>", unsafe_allow_html=True)
         with c4:
@@ -364,7 +378,7 @@ elif menu == "🚛 Operadores Pesaje":
             cnt_uni = df_mostrar[col_unidad].value_counts().head(10).reset_index() if not df_mostrar.empty else pd.DataFrame(columns=['Unidad','Viajes'])
             cnt_uni.columns = ['Unidad','Viajes']
             fig3 = px.bar(cnt_uni, x='Unidad', y='Viajes', text='Viajes', color='Viajes', color_continuous_scale='Greens')
-            fig3.update_layout(height=260, margin=dict(l=10,r=10,t=10,b=30), paper_bgcolor="white", showlegend=False)
+            fig3.update_layout(height=380, margin=dict(l=10,r=10,t=10,b=30), paper_bgcolor="white", showlegend=False)
             fig3.update_traces(textposition='outside')
             st.plotly_chart(fig3, use_container_width=True)
             st.markdown("</div>", unsafe_allow_html=True)
@@ -391,7 +405,7 @@ elif menu == "🚛 Operadores Pesaje":
         with cs1:
             st.metric("Con Boleta", con_hoy_real)
             st.metric("SIN Boleta", len(faltantes_hoy), delta=f"-{len(faltantes_hoy)}", delta_color="inverse")
-            st.caption(f"Catalogo: {len(catalogo_completo)} | En vista: {len(registrados_hoy)} | {etiqueta_fecha}")
+            st.caption(f"Catalogo: {len(catalogo_completo)} | En vista: {len(registrados_hoy)} | {etiqueta_fecha} | Productividad: {productividad_global:.2f}%")
             if len(faltantes_hoy)+con_hoy_real>0:
                 fig_f = go.Figure(data=[go.Pie(labels=['Con','Sin'], values=[con_hoy_real, len(faltantes_hoy)], hole=0.65, marker_colors=['#00b050','#ff0000'], textinfo='label+value')])
                 fig_f.update_layout(height=280, margin=dict(l=10,r=10,t=10,b=10), paper_bgcolor="white")
@@ -408,7 +422,7 @@ elif menu == "🚛 Operadores Pesaje":
                 st.balloons()
         st.markdown("</div>", unsafe_allow_html=True)
 
-        st.markdown(f'<div class="gepp-card"><div class="gepp-header">📊 PRODUCTIVIDAD - {etiqueta_fecha}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="gepp-card"><div class="gepp-header">📊 PRODUCTIVIDAD - {etiqueta_fecha} - {productividad_global:.2f}% GLOBAL (11 OPS)</div>', unsafe_allow_html=True)
         if not prod_hoy.empty:
             fig_prod = px.bar(prod_hoy, x='Productividad_%', y='Operador', orientation='h', text='Productividad_%', color='Productividad_%', color_continuous_scale=['#ff0000','#ffcc00','#00b050'], range_color=[0,150])
             fig_prod.add_vline(x=100, line_dash="dash", line_color="green", annotation_text="100% = 3 viajes")
