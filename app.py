@@ -7,6 +7,10 @@ import requests, base64
 from datetime import datetime
 import pytz
 import unicodedata
+import re
+import hashlib
+from PIL import Image
+import pytesseract
 
 TZ_MEXICO = pytz.timezone("America/Monterrey")
 st.set_page_config(page_title="Red Ambiental - V44.9 FIX ACENTOS", layout="wide", page_icon="♻️")
@@ -71,10 +75,41 @@ def load_catalogo_operadores():
         "Ricardo Cazares Diaz",
         "Carlos Garcia Macias",
         "Francisco Mazuca Macias",
-        "Kevin Rodriguez Lopez",
         "Angel Garcia Navarro",
         "Luis Fernando Perez Castañeda"
     ]
+
+# --- FUNCIONES SOLO PARA BOLETA OFICIAL 2001-0098816 ---
+def get_image_hash(file_bytes):
+    return hashlib.md5(file_bytes).hexdigest()
+
+def extraer_fecha_de_imagen(img_pil):
+    try:
+        texto = pytesseract.image_to_string(img_pil, lang='spa+eng')
+        texto_up = texto.upper()
+        # Formato oficial: Fecha E: 21/10/2026
+        patron_fecha = re.findall(r'FECHA\s*[ES]:\s*(\d{1,2}/\d{1,2}/\d{4})', texto_up)
+        if patron_fecha:
+            f = pd.to_datetime(patron_fecha[0], dayfirst=True, errors='coerce')
+            if pd.notna(f): return f.date(), patron_fecha[0], texto
+        patron1 = re.search(r'(\d{1,2}/\d{1,2}/\d{4})', texto_up)
+        if patron1:
+            f = pd.to_datetime(patron1.group(1), dayfirst=True, errors='coerce')
+            if pd.notna(f): return f.date(), patron1.group(1), texto
+        return None, None, texto
+    except Exception as e:
+        return None, f"Error {e}", ""
+
+def extraer_folio_boleta(img_pil):
+    try:
+        texto = pytesseract.image_to_string(img_pil, lang='spa+eng')
+        texto_up = texto.upper()
+        m = re.search(r'FOLIO:\s*([0-9\-]+)', texto_up)
+        if m:
+            return m.group(1).strip(), texto
+        return None, texto
+    except:
+        return None, ""
 
 df_full = load()
 
@@ -244,25 +279,82 @@ if menu == "📊 Dashboard Asistencias":
 elif menu == "🚛 Operadores Pesaje":
     st.markdown("<h1 style='color:#0f3d1f; text-align:center;'>RED AMBIENTAL</h1>", unsafe_allow_html=True)
     st.markdown("<h2 style='color:#2e7d32; text-align:center;'>🚛 Dashboard Operadores - Pesaje</h2>", unsafe_allow_html=True)
-    with st.expander("📝 Registrar Nuevo Viaje", expanded=False):
+    
+    with st.expander("📝 Registrar Nuevo Viaje - CANDADO FECHA Y FOLIO", expanded=False):
         c1,c2 = st.columns(2)
         with c1:
             nombre = st.text_input("Nombre Completo", placeholder="Ej: Juan Perez Lopez", key="op_n")
             unidad = st.text_input("Numero de Unidad", placeholder="Ej: 1234", key="op_u")
         with c2:
             base = st.text_input("Base donde se encuentra", placeholder="Garcia, Cienega...", key="op_b")
-            foto = st.file_uploader("Foto Boleta", type=["jpg","jpeg","png"], key="op_f")
+            foto = st.file_uploader("Foto Boleta OFICIAL - SOLO DEL DIA", type=["jpg","jpeg","png"], key="op_f")
+
+        fecha_valida = False
+        folio_detectado = None
+        hash_imagen = None
+
+        if foto:
+            st.image(foto, caption="Vista previa boleta", width=350)
+            file_bytes = foto.getvalue()
+            hash_imagen = get_image_hash(file_bytes)
+            with st.spinner("🔍 Leyendo FOLIO y Fecha E: de tu boleta oficial..."):
+                try:
+                    img_pil = Image.open(foto)
+                    fecha_boleta, fecha_texto, _ = extraer_fecha_de_imagen(img_pil)
+                    folio_detectado, _ = extraer_folio_boleta(img_pil)
+                    hoy_mty = datetime.now(TZ_MEXICO).date()
+
+                    if folio_detectado:
+                        st.info(f"📄 Folio detectado: {folio_detectado} | Hash: {hash_imagen[:8]}")
+
+                    # --- BLOQUEO DUPLICADO ---
+                    try:
+                        df_check = load_operadores()
+                        col_hash = [c for c in df_check.columns if 'hash' in c.lower()]
+                        col_folio = [c for c in df_check.columns if 'folio' in c.lower()]
+                        
+                        if col_hash and not df_check.empty and hash_imagen in df_check[col_hash[0]].astype(str).values:
+                            st.error(f"❌ ESTA BOLETA YA HA SIDO REGISTRADA - Hash duplicado")
+                            st.stop()
+                        
+                        if col_folio and folio_detectado and not df_check.empty:
+                            if folio_detectado in df_check[col_folio[0]].astype(str).values:
+                                dup = df_check[df_check[col_folio[0]].astype(str)==str(folio_detectado)].iloc[0]
+                                st.error(f"❌ ESTA BOLETA YA HA SIDO REGISTRADA - Folio {folio_detectado} ya fue registrado")
+                                st.stop()
+                    except Exception as e:
+                        pass
+
+                    if fecha_boleta:
+                        st.info(f"📅 Fecha en boleta: {fecha_boleta.strftime('%d/%m/%Y')} | Hoy: {hoy_mty.strftime('%d/%m/%Y')}")
+                        if fecha_boleta != hoy_mty:
+                            st.error(f"❌ BOLETA NO ES DE HOY. Dice {fecha_boleta.strftime('%d/%m/%Y')} y hoy es {hoy_mty.strftime('%d/%m/%Y')}")
+                            fecha_valida = False
+                        else:
+                            st.success(f"✅ Boleta válida de hoy ({fecha_texto}) - Folio {folio_detectado or 'N/A'}")
+                            fecha_valida = True
+                    else:
+                        st.warning("⚠️ No pude leer Fecha E: - Toma foto más nítida donde se vea FECHA E")
+                        fecha_valida = False
+                except Exception as e:
+                    st.error(f"Error leyendo imagen: {e}")
+                    fecha_valida = False
+
         if st.button("💾 Guardar Registro Operador", type="primary", use_container_width=True):
             if not nombre or not unidad or not base or not foto:
                 st.error("❌ Complete todos los campos obligatorios")
+            elif not fecha_valida:
+                st.error(f"❌ No se puede guardar. La boleta debe ser del día de hoy ({datetime.now(TZ_MEXICO).date().strftime('%d/%m/%Y')}) y folio no duplicado")
             else:
                 with st.spinner("Procesando..."):
                     b64 = base64.b64encode(foto.getvalue()).decode('utf-8')
                     b64 = f"data:{foto.type};base64,{b64}"
-                    payload = {"nombreCompleto": nombre, "unidad": unidad, "base": base, "foto": b64}
+                    payload = {"nombreCompleto": nombre, "unidad": unidad, "base": base, "foto": b64, "folio": folio_detectado or "", "hash": hash_imagen or ""}
                     requests.post(URL_OPERADORES, json=payload, headers={"Content-Type":"text/plain;charset=utf-8"}, timeout=30)
-                    st.success("✅ Registro guardado correctamente"); st.balloons()
+                    st.success(f"✅ Registro guardado - BOLETA DEL DIA - Folio {folio_detectado}")
+                    st.balloons()
                     st.cache_data.clear()
+
     try:
         df_op = load_operadores()
         col_nombre = [c for c in df_op.columns if 'nombre' in c.lower()][0]
@@ -349,7 +441,7 @@ elif menu == "🚛 Operadores Pesaje":
                 <div style="width:100%; height:1px; background:#1a4d2e; margin:12px 0;"></div>
                 <p style="font-size:12px; color:#a0c4a8; font-weight:bold;">PRODUCTIVIDAD DEL DIA</p>
                 <p style="font-size:54px; font-weight:900; margin:4px 0; line-height:1; color:{color_prod};">{productividad_global:.2f}%</p>
-                <p style="font-size:11px; color:#d0d0d0; margin-top:4px;">Meta fija: {META_TOTAL_FILTRO} viajes (11 ops x 4{" x "+str(dias_filtro)+" días" if modo_vista!="Por Día" else ""})<br>{total_viajes_mostrar} / {META_TOTAL_FILTRO}</p>
+                <p style="font-size:11px; color:#d0d0d0; margin-top:4px;">Meta fija: {META_TOTAL_FILTRO} viajes (13 ops x 4{" x "+str(dias_filtro)+" días" if modo_vista!="Por Día" else ""})<br>{total_viajes_mostrar} / {META_TOTAL_FILTRO}</p>
                 <div style="width:50px; height:50px; background:{color_prod}; border-radius:50%; margin-top:10px; border:3px solid white; box-shadow:0 0 12px {color_prod};"></div>
             </div>
             ''', unsafe_allow_html=True)
@@ -379,7 +471,7 @@ elif menu == "🚛 Operadores Pesaje":
             st.plotly_chart(fig3, use_container_width=True)
             st.markdown("</div>", unsafe_allow_html=True)
 
-        st.markdown(f'<div class="gepp-card"><div class="gepp-header">🚨 OPERADORES SIN REGISTRO - {etiqueta_fecha} - 12 REALES (FIX FUZZY CARLOS)</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="gepp-card"><div class="gepp-header">🚨 OPERADORES SIN REGISTRO - {etiqueta_fecha} - 13 REALES</div>', unsafe_allow_html=True)
         catalogo_completo = load_catalogo_operadores()
         registrados_hoy = df_hoy[col_nombre].astype(str).str.strip().unique().tolist() if not df_hoy.empty else []
         def norm(s):
@@ -418,7 +510,7 @@ elif menu == "🚛 Operadores Pesaje":
                 st.balloons()
         st.markdown("</div>", unsafe_allow_html=True)
 
-        st.markdown(f'<div class="gepp-card"><div class="gepp-header">📊 PRODUCTIVIDAD - {etiqueta_fecha} - {productividad_global:.2f}% GLOBAL (11 OPS)</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="gepp-card"><div class="gepp-header">📊 PRODUCTIVIDAD - {etiqueta_fecha} - {productividad_global:.2f}% GLOBAL (13 OPS)</div>', unsafe_allow_html=True)
         if not prod_hoy.empty:
             fig_prod = px.bar(prod_hoy, x='Productividad_%', y='Operador', orientation='h', text='Productividad_%', color='Productividad_%', color_continuous_scale=['#ff0000','#ffcc00','#00b050'], range_color=[0,150])
             fig_prod.add_vline(x=100, line_dash="dash", line_color="green", annotation_text="100% = 4 viajes")
