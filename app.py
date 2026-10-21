@@ -266,7 +266,7 @@ elif menu == "🚛 Operadores Pesaje":
         col_nombre = [c for c in df_op.columns if 'nombre' in c.lower()][0]
         col_unidad = [c for c in df_op.columns if 'unidad' in c.lower()][0]
         col_base = [c for c in df_op.columns if 'base' in c.lower()][0]
-        META_DIARIA = 3
+        META_DIARIA = 4
         col_fecha = None
         for c in df_op.columns:
             if 'marca' in c.lower() or 'timestamp' in c.lower() or 'fecha' in c.lower():
@@ -347,7 +347,7 @@ elif menu == "🚛 Operadores Pesaje":
                 <div style="width:100%; height:1px; background:#1a4d2e; margin:12px 0;"></div>
                 <p style="font-size:12px; color:#a0c4a8; font-weight:bold;">PRODUCTIVIDAD DEL DIA</p>
                 <p style="font-size:54px; font-weight:900; margin:4px 0; line-height:1; color:{color_prod};">{productividad_global:.2f}%</p>
-                <p style="font-size:11px; color:#d0d0d0; margin-top:4px;">Meta fija: {META_TOTAL_FILTRO} viajes (11 ops x 3{" x "+str(dias_filtro)+" días" if modo_vista!="Por Día" else ""})<br>{total_viajes_mostrar} / {META_TOTAL_FILTRO}</p>
+                <p style="font-size:11px; color:#d0d0d0; margin-top:4px;">Meta fija: {META_TOTAL_FILTRO} viajes (11 ops x 4{" x "+str(dias_filtro)+" días" if modo_vista!="Por Día" else ""})<br>{total_viajes_mostrar} / {META_TOTAL_FILTRO}</p>
                 <div style="width:50px; height:50px; background:{color_prod}; border-radius:50%; margin-top:10px; border:3px solid white; box-shadow:0 0 12px {color_prod};"></div>
             </div>
             ''', unsafe_allow_html=True)
@@ -419,7 +419,7 @@ elif menu == "🚛 Operadores Pesaje":
         st.markdown(f'<div class="gepp-card"><div class="gepp-header">📊 PRODUCTIVIDAD - {etiqueta_fecha} - {productividad_global:.2f}% GLOBAL (11 OPS)</div>', unsafe_allow_html=True)
         if not prod_hoy.empty:
             fig_prod = px.bar(prod_hoy, x='Productividad_%', y='Operador', orientation='h', text='Productividad_%', color='Productividad_%', color_continuous_scale=['#ff0000','#ffcc00','#00b050'], range_color=[0,150])
-            fig_prod.add_vline(x=100, line_dash="dash", line_color="green", annotation_text="100% = 3 viajes")
+            fig_prod.add_vline(x=100, line_dash="dash", line_color="green", annotation_text="100% = 4 viajes")
             fig_prod.update_layout(height=500, margin=dict(l=10,r=60,t=20,b=10), paper_bgcolor="white", plot_bgcolor="white", showlegend=False)
             fig_prod.update_traces(texttemplate='%{text:.0f}% - %{customdata} viajes', customdata=prod_hoy['Viajes_Hoy'], textposition='outside')
             st.plotly_chart(fig_prod, use_container_width=True)
