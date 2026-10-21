@@ -9,7 +9,7 @@ import pytz
 import unicodedata
 
 TZ_MEXICO = pytz.timezone("America/Monterrey")
-st.set_page_config(page_title="Red Ambiental - V44.9 FIX ACENTOS", layout="wide", page_icon="♻️")
+st.set_page_config(page_title="Red Ambiental - V45 13 OPS x 4 VIAJES", layout="wide", page_icon="♻️")
 st.markdown("""
 <style>
 .stApp { background-color: #e9ecf2; }
@@ -19,7 +19,7 @@ section[data-testid="stSidebar"] { background-color: #0a2211; }
 </style>
 """, unsafe_allow_html=True)
 
-URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRdHGoaJ3BSFqaU4DIH1Wks7dROyzp3z7Z_guIBoAD7VzSXCIis14R9HMPCaDmF3omEK5RzEDlua1aR/pub?gid=1011674108&single=true&output=csv"
+URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRdHGoaU4DIH1Wks7dROyzp3z7Z_guIBoAD7VzSXCIis14R9HMPCaDmF3omEK5RzEDlua1aR/pub?gid=1011674108&single=true&output=csv"
 ID_SHEET_BOLETAS = "1-9KNHfB0syWmZNFGfti3mIEjTjFjbSz3qKiAiyXXvms"
 URL_OPERADORES = "https://script.google.com/macros/s/AKfycbxfb7MVBqN_3xk5a9ICVa7X9zKWtH1s9PEfgv_QpU0iW54q6_gldoNgXbpHU8DztwI/exec"
 
@@ -71,7 +71,8 @@ def load_catalogo_operadores():
         "Ricardo Cazares Diaz",
         "Carlos Garcia Macias",
         "Francisco Mazuca Macias",
-        "Kevin Rodriguez Lopez"
+        "Angel Garcia Navarro",
+        "Luis Fernando Perez Castañeda"
     ]
 
 df_full = load()
@@ -310,7 +311,7 @@ elif menu == "🚛 Operadores Pesaje":
                     etiqueta_fecha = "TODO ACUMULADO"
                     dias_filtro = df_mostrar['fecha_solo'].nunique() if not df_mostrar.empty else 1
 
-        TOTAL_OPS_FIJO = 11
+        TOTAL_OPS_FIJO = 13
         META_TOTAL_DIA_FIJO = TOTAL_OPS_FIJO * META_DIARIA
         if modo_vista == "Acumulado por Rango":
             META_TOTAL_FILTRO = META_TOTAL_DIA_FIJO * dias_filtro
@@ -347,7 +348,7 @@ elif menu == "🚛 Operadores Pesaje":
                 <div style="width:100%; height:1px; background:#1a4d2e; margin:12px 0;"></div>
                 <p style="font-size:12px; color:#a0c4a8; font-weight:bold;">PRODUCTIVIDAD DEL DIA</p>
                 <p style="font-size:54px; font-weight:900; margin:4px 0; line-height:1; color:{color_prod};">{productividad_global:.2f}%</p>
-                <p style="font-size:11px; color:#d0d0d0; margin-top:4px;">Meta fija: {META_TOTAL_FILTRO} viajes (11 ops x 4{" x "+str(dias_filtro)+" días" if modo_vista!="Por Día" else ""})<br>{total_viajes_mostrar} / {META_TOTAL_FILTRO}</p>
+                <p style="font-size:11px; color:#d0d0d0; margin-top:4px;">Meta fija: {META_TOTAL_FILTRO} viajes (13 ops x 4{" x "+str(dias_filtro)+" días" if modo_vista!="Por Día" else ""})<br>{total_viajes_mostrar} / {META_TOTAL_FILTRO}</p>
                 <div style="width:50px; height:50px; background:{color_prod}; border-radius:50%; margin-top:10px; border:3px solid white; box-shadow:0 0 12px {color_prod};"></div>
             </div>
             ''', unsafe_allow_html=True)
@@ -377,7 +378,7 @@ elif menu == "🚛 Operadores Pesaje":
             st.plotly_chart(fig3, use_container_width=True)
             st.markdown("</div>", unsafe_allow_html=True)
 
-        st.markdown(f'<div class="gepp-card"><div class="gepp-header">🚨 OPERADORES SIN REGISTRO - {etiqueta_fecha} - 12 REALES (FIX FUZZY CARLOS)</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="gepp-card"><div class="gepp-header">🚨 OPERADORES SIN REGISTRO - {etiqueta_fecha} - 13 REALES (SIN KEVIN)</div>', unsafe_allow_html=True)
         catalogo_completo = load_catalogo_operadores()
         registrados_hoy = df_hoy[col_nombre].astype(str).str.strip().unique().tolist() if not df_hoy.empty else []
         def norm(s):
@@ -416,7 +417,7 @@ elif menu == "🚛 Operadores Pesaje":
                 st.balloons()
         st.markdown("</div>", unsafe_allow_html=True)
 
-        st.markdown(f'<div class="gepp-card"><div class="gepp-header">📊 PRODUCTIVIDAD - {etiqueta_fecha} - {productividad_global:.2f}% GLOBAL (11 OPS)</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="gepp-card"><div class="gepp-header">📊 PRODUCTIVIDAD - {etiqueta_fecha} - {productividad_global:.2f}% GLOBAL (13 OPS)</div>', unsafe_allow_html=True)
         if not prod_hoy.empty:
             fig_prod = px.bar(prod_hoy, x='Productividad_%', y='Operador', orientation='h', text='Productividad_%', color='Productividad_%', color_continuous_scale=['#ff0000','#ffcc00','#00b050'], range_color=[0,150])
             fig_prod.add_vline(x=100, line_dash="dash", line_color="green", annotation_text="100% = 4 viajes")
