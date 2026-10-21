@@ -71,7 +71,9 @@ def load_catalogo_operadores():
         "Ricardo Cazares Diaz",
         "Carlos Garcia Macias",
         "Francisco Mazuca Macias",
-        "Kevin Rodriguez Lopez"
+        "Kevin Rodriguez Lopez",
+        "Angel Garcia Navarro",
+        "Luis Fernando Perez Castañeda"
     ]
 
 df_full = load()
@@ -310,7 +312,7 @@ elif menu == "🚛 Operadores Pesaje":
                     etiqueta_fecha = "TODO ACUMULADO"
                     dias_filtro = df_mostrar['fecha_solo'].nunique() if not df_mostrar.empty else 1
 
-        TOTAL_OPS_FIJO = 11
+        TOTAL_OPS_FIJO = 13
         META_TOTAL_DIA_FIJO = TOTAL_OPS_FIJO * META_DIARIA
         if modo_vista == "Acumulado por Rango":
             META_TOTAL_FILTRO = META_TOTAL_DIA_FIJO * dias_filtro
