@@ -5,3 +5,5 @@ folium
 streamlit-folium
 pytz
 requests
+Pillow
+pytesseract
