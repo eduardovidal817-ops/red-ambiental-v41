@@ -26,13 +26,23 @@ URL_OPERADORES = "https://script.google.com/macros/s/AKfycbxfb7MVBqN_3xk5a9ICVa7
 
 @st.cache_data(ttl=60)
 def load():
+    df = None
+    # Intento 1 - como lo tenías originalmente
     try:
         df = pd.read_csv(URL)
     except Exception:
-        r = requests.get(URL, timeout=30, headers={"User-Agent": "Mozilla/5.0"})
-        r.raise_for_status()
-        df = pd.read_csv(io.StringIO(r.text))
-    
+        pass
+    # Intento 2 - con requests y cachebust (igual que operadores) para evitar el HTTPError de tu captura
+    if df is None:
+        try:
+            url_retry = URL + f"&cachebust={datetime.now().strftime('%Y%m%d%H%M%S')}"
+            r = requests.get(url_retry, timeout=30, headers={"User-Agent": "Mozilla/5.0"})
+            r.raise_for_status()
+            df = pd.read_csv(io.StringIO(r.text))
+        except Exception:
+            # Si falla todo, regresamos vacío para que NO salga el pantallazo rojo de tu captura
+            return pd.DataFrame(columns=["Fecha","Planta","Coordinador","¿Dentro?","Horas Trabajadas","Hora Entrada","Hora Salida","Nombre completo","Latitud","Longitud"])
+
     df.columns = df.columns.str.strip()
     df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
     if 'Estatus Entrega' in df.columns: df = df.drop(columns=['Estatus Entrega'])
@@ -115,7 +125,7 @@ with st.sidebar:
     if st.button("🔄 ACTUALIZAR TODO", type="primary", use_container_width=True):
         st.cache_data.clear(); st.rerun()
     st.markdown("---")
-    if menu == "📊 Dashboard Asistencias":
+    if menu == "📊 Dashboard Asistencias" and not df_full.empty:
         df_full['Fecha_dt'] = pd.to_datetime(df_full['Fecha'], dayfirst=True, errors='coerce')
         try:
             min_f = df_full['Fecha_dt'].min().date(); max_f = df_full['Fecha_dt'].max().date()
@@ -126,8 +136,15 @@ with st.sidebar:
         coords = ["Todos"] + sorted(df_full["Coordinador"].dropna().astype(str).unique().tolist()) if "Coordinador" in df_full.columns else ["Todos"]
         coord_sel = st.selectbox("Coordinador", coords)
         dentro_sel = st.selectbox("¿Dentro?", ["Todos","DENTRO","FUERA"])
+    else:
+        fecha_sel = None; planta_sel = "Todas"; coord_sel = "Todos"; dentro_sel = "Todos"
 
 if menu == "📊 Dashboard Asistencias":
+    if df_full.empty:
+        st.warning("⚠️ Google Sheets de Asistencias está tardando en responder. Dale clic a ACTUALIZAR TODO y espera 10 seg. El de Operadores sigue jalando normal.")
+        if st.button("🔄 Reintentar cargar asistencias"):
+            st.cache_data.clear(); st.rerun()
+        st.stop()
     df = df_full.copy()
     if fecha_sel and isinstance(fecha_sel, tuple) and len(fecha_sel)==2:
         try: df = df[(df['Fecha_dt'].dt.date >= fecha_sel[0]) & (df['Fecha_dt'].dt.date <= fecha_sel[1])]
