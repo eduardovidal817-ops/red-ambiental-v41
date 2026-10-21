@@ -75,7 +75,13 @@ def load_catalogo_operadores():
         "Luis Fernando Perez Castañeda"
     ]
 
-df_full = load()
+# --- ÚNICO CAMBIO PARA EVITAR PANTALLAZO ROJO, SIN TOCAR TU FUNCIÓN load() ---
+try:
+    df_full = load()
+except Exception as e:
+    df_full = pd.DataFrame()
+    # Guardamos el error para mostrarlo solo en el dashboard de asistencias
+    st.session_state['error_asistencia'] = str(e)
 
 def render_zebra(df_to_show, max_h="340px"):
     html = f"""<style>.zebra-table{{width:100%;border-collapse:collapse;font-size:11px;font-family:Arial;}}.zebra-table th{{background:#0f3d1f;color:white;padding:8px;text-align:left;position:sticky;top:0;z-index:2;}}.zebra-table td{{padding:7px 8px;border-bottom:1px solid #e0e0e0;}}.zebra-table tr:nth-child(even){{background:#f2f4f7;}}.zebra-table tr:nth-child(odd){{background:#ffffff;}}.zebra-table tr:hover{{background:#d1e7dd!important;}}.badge-dentro{{background:#00b050;color:white;padding:2px 6px;border-radius:10px;font-weight:bold;font-size:10px;}}.badge-fuera{{background:#ff0000;color:white;padding:2px 6px;border-radius:10px;font-weight:bold;font-size:10px;}}.badge-excelente{{background:#00b050;color:white;padding:2px 6px;border-radius:10px;font-weight:bold;font-size:10px;}}.badge-bueno{{background:#ffcc00;color:black;padding:2px 6px;border-radius:10px;font-weight:bold;font-size:10px;}}.badge-malo{{background:#ff0000;color:white;padding:2px 6px;border-radius:10px;font-weight:bold;font-size:10px;}}</style><div style="max-height:{max_h}; overflow:auto; background:white; border-radius:0 0 6px 6px;"><table class="zebra-table"><thead><tr>"""
@@ -108,7 +114,7 @@ with st.sidebar:
     if st.button("🔄 ACTUALIZAR TODO", type="primary", use_container_width=True):
         st.cache_data.clear(); st.rerun()
     st.markdown("---")
-    if menu == "📊 Dashboard Asistencias":
+    if menu == "📊 Dashboard Asistencias" and not df_full.empty:
         df_full['Fecha_dt'] = pd.to_datetime(df_full['Fecha'], dayfirst=True, errors='coerce')
         try:
             min_f = df_full['Fecha_dt'].min().date(); max_f = df_full['Fecha_dt'].max().date()
@@ -119,8 +125,15 @@ with st.sidebar:
         coords = ["Todos"] + sorted(df_full["Coordinador"].dropna().astype(str).unique().tolist()) if "Coordinador" in df_full.columns else ["Todos"]
         coord_sel = st.selectbox("Coordinador", coords)
         dentro_sel = st.selectbox("¿Dentro?", ["Todos","DENTRO","FUERA"])
+    else:
+        fecha_sel = None; planta_sel = "Todas"; coord_sel = "Todos"; dentro_sel = "Todos"
 
 if menu == "📊 Dashboard Asistencias":
+    if df_full.empty:
+        st.error("⚠️ Google Sheets de Asistencias no respondió. Dale a ACTUALIZAR TODO en 10 seg. El módulo de Operadores sí funciona abajo.")
+        if st.button("🔄 Reintentar cargar asistencias"):
+            st.cache_data.clear(); st.rerun()
+        st.stop()
     df = df_full.copy()
     if fecha_sel and isinstance(fecha_sel, tuple) and len(fecha_sel)==2:
         try: df = df[(df['Fecha_dt'].dt.date >= fecha_sel[0]) & (df['Fecha_dt'].dt.date <= fecha_sel[1])]
