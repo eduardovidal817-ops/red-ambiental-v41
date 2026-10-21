@@ -7,10 +7,9 @@ import requests, base64
 from datetime import datetime
 import pytz
 import unicodedata
-import io
 
 TZ_MEXICO = pytz.timezone("America/Monterrey")
-st.set_page_config(page_title="Red Ambiental - V45.1 FIX ERROR + 13 OPS", layout="wide", page_icon="♻️")
+st.set_page_config(page_title="Red Ambiental - V44.9 FIX ACENTOS", layout="wide", page_icon="♻️")
 st.markdown("""
 <style>
 .stApp { background-color: #e9ecf2; }
@@ -20,40 +19,31 @@ section[data-testid="stSidebar"] { background-color: #0a2211; }
 </style>
 """, unsafe_allow_html=True)
 
-URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRdHGoaU4DIH1Wks7dROyzp3z7Z_guIBoAD7VzSXCIis14R9HMPCaDmF3omEK5RzEDlua1aR/pub?gid=1011674108&single=true&output=csv"
+URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRdHGoaJ3BSFqaU4DIH1Wks7dROyzp3z7Z_guIBoAD7VzSXCIis14R9HMPCaDmF3omEK5RzEDlua1aR/pub?gid=1011674108&single=true&output=csv"
 ID_SHEET_BOLETAS = "1-9KNHfB0syWmZNFGfti3mIEjTjFjbSz3qKiAiyXXvms"
 URL_OPERADORES = "https://script.google.com/macros/s/AKfycbxfb7MVBqN_3xk5a9ICVa7X9zKWtH1s9PEfgv_QpU0iW54q6_gldoNgXbpHU8DztwI/exec"
 
 @st.cache_data(ttl=60)
 def load():
-    try:
-        try:
-            df = pd.read_csv(URL)
-        except Exception:
-            r = requests.get(URL, timeout=30, headers={"User-Agent": "Mozilla/5.0"})
-            r.raise_for_status()
-            df = pd.read_csv(io.StringIO(r.text))
-        
-        df.columns = df.columns.str.strip()
-        df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
-        if 'Estatus Entrega' in df.columns: df = df.drop(columns=['Estatus Entrega'])
-        mapa = {"BAXTER": "Eduardo Vidal","POLOMEX": "Felix Najera","AMAZON MTY1": "Felix Najera","AMAZON MTY2": "Felix Najera","AMAZON MTY3": "Felix Najera","JUEGOS DEL VALLE": "Felix Najera","CELESTICA": "Felix Najera","CATERPILLAR CIENEGA": "Sergio Llanes"}
-        def get_coord(r):
-            c = str(r.get("Coordinador","")).strip()
-            if c.lower() not in ["","nan","none","sin asignar"]: return c
-            return mapa.get(str(r.get("Planta","")).upper().strip(), "SIN ASIGNAR")
-        if "Coordinador" not in df.columns: df["Coordinador"] = ""
-        df["Coordinador"] = df.apply(get_coord, axis=1)
-        for col_fix in ["Hora Entrada", "Hora Salida"]:
-            if col_fix in df.columns:
-                try:
-                    s = pd.to_datetime(df[col_fix].astype(str).str.strip(), errors='coerce')
-                    df[col_fix] = s.dt.strftime('%I:%M:%S %p')
-                except:
-                    pass
-        return df
-    except Exception as e:
-        return pd.DataFrame(columns=["Fecha","Planta","Coordinador","¿Dentro?","Horas Trabajadas","Hora Entrada","Hora Salida","Nombre completo"])
+    df = pd.read_csv(URL)
+    df.columns = df.columns.str.strip()
+    df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
+    if 'Estatus Entrega' in df.columns: df = df.drop(columns=['Estatus Entrega'])
+    mapa = {"BAXTER": "Eduardo Vidal","POLOMEX": "Felix Najera","AMAZON MTY1": "Felix Najera","AMAZON MTY2": "Felix Najera","AMAZON MTY3": "Felix Najera","JUEGOS DEL VALLE": "Felix Najera","CELESTICA": "Felix Najera","CATERPILLAR CIENEGA": "Sergio Llanes"}
+    def get_coord(r):
+        c = str(r.get("Coordinador","")).strip()
+        if c.lower() not in ["","nan","none","sin asignar"]: return c
+        return mapa.get(str(r.get("Planta","")).upper().strip(), "SIN ASIGNAR")
+    if "Coordinador" not in df.columns: df["Coordinador"] = ""
+    df["Coordinador"] = df.apply(get_coord, axis=1)
+    for col_fix in ["Hora Entrada", "Hora Salida"]:
+        if col_fix in df.columns:
+            try:
+                s = pd.to_datetime(df[col_fix].astype(str).str.strip(), errors='coerce')
+                df[col_fix] = s.dt.strftime('%I:%M:%S %p')
+            except:
+                pass
+    return df
 
 @st.cache_data(ttl=10)
 def load_operadores():
@@ -81,15 +71,10 @@ def load_catalogo_operadores():
         "Ricardo Cazares Diaz",
         "Carlos Garcia Macias",
         "Francisco Mazuca Macias",
-        "Angel Garcia Navarro",
-        "Luis Fernando Perez Castañeda"
+        "Kevin Rodriguez Lopez"
     ]
 
-try:
-    df_full = load()
-except Exception as e:
-    st.warning(f"Error cargando asistencias: {e}")
-    df_full = pd.DataFrame()
+df_full = load()
 
 def render_zebra(df_to_show, max_h="340px"):
     html = f"""<style>.zebra-table{{width:100%;border-collapse:collapse;font-size:11px;font-family:Arial;}}.zebra-table th{{background:#0f3d1f;color:white;padding:8px;text-align:left;position:sticky;top:0;z-index:2;}}.zebra-table td{{padding:7px 8px;border-bottom:1px solid #e0e0e0;}}.zebra-table tr:nth-child(even){{background:#f2f4f7;}}.zebra-table tr:nth-child(odd){{background:#ffffff;}}.zebra-table tr:hover{{background:#d1e7dd!important;}}.badge-dentro{{background:#00b050;color:white;padding:2px 6px;border-radius:10px;font-weight:bold;font-size:10px;}}.badge-fuera{{background:#ff0000;color:white;padding:2px 6px;border-radius:10px;font-weight:bold;font-size:10px;}}.badge-excelente{{background:#00b050;color:white;padding:2px 6px;border-radius:10px;font-weight:bold;font-size:10px;}}.badge-bueno{{background:#ffcc00;color:black;padding:2px 6px;border-radius:10px;font-weight:bold;font-size:10px;}}.badge-malo{{background:#ff0000;color:white;padding:2px 6px;border-radius:10px;font-weight:bold;font-size:10px;}}</style><div style="max-height:{max_h}; overflow:auto; background:white; border-radius:0 0 6px 6px;"><table class="zebra-table"><thead><tr>"""
@@ -122,7 +107,7 @@ with st.sidebar:
     if st.button("🔄 ACTUALIZAR TODO", type="primary", use_container_width=True):
         st.cache_data.clear(); st.rerun()
     st.markdown("---")
-    if menu == "📊 Dashboard Asistencias" and not df_full.empty:
+    if menu == "📊 Dashboard Asistencias":
         df_full['Fecha_dt'] = pd.to_datetime(df_full['Fecha'], dayfirst=True, errors='coerce')
         try:
             min_f = df_full['Fecha_dt'].min().date(); max_f = df_full['Fecha_dt'].max().date()
@@ -133,16 +118,8 @@ with st.sidebar:
         coords = ["Todos"] + sorted(df_full["Coordinador"].dropna().astype(str).unique().tolist()) if "Coordinador" in df_full.columns else ["Todos"]
         coord_sel = st.selectbox("Coordinador", coords)
         dentro_sel = st.selectbox("¿Dentro?", ["Todos","DENTRO","FUERA"])
-    else:
-        fecha_sel = None
-        planta_sel = "Todas"
-        coord_sel = "Todos"
-        dentro_sel = "Todos"
 
 if menu == "📊 Dashboard Asistencias":
-    if df_full.empty:
-        st.warning("⚠️ No se pudo cargar asistencias en este momento. El módulo de Operadores sigue funcionando. Dale a ACTUALIZAR TODO.")
-        st.stop()
     df = df_full.copy()
     if fecha_sel and isinstance(fecha_sel, tuple) and len(fecha_sel)==2:
         try: df = df[(df['Fecha_dt'].dt.date >= fecha_sel[0]) & (df['Fecha_dt'].dt.date <= fecha_sel[1])]
@@ -333,7 +310,7 @@ elif menu == "🚛 Operadores Pesaje":
                     etiqueta_fecha = "TODO ACUMULADO"
                     dias_filtro = df_mostrar['fecha_solo'].nunique() if not df_mostrar.empty else 1
 
-        TOTAL_OPS_FIJO = 13
+        TOTAL_OPS_FIJO = 11
         META_TOTAL_DIA_FIJO = TOTAL_OPS_FIJO * META_DIARIA
         if modo_vista == "Acumulado por Rango":
             META_TOTAL_FILTRO = META_TOTAL_DIA_FIJO * dias_filtro
@@ -370,7 +347,7 @@ elif menu == "🚛 Operadores Pesaje":
                 <div style="width:100%; height:1px; background:#1a4d2e; margin:12px 0;"></div>
                 <p style="font-size:12px; color:#a0c4a8; font-weight:bold;">PRODUCTIVIDAD DEL DIA</p>
                 <p style="font-size:54px; font-weight:900; margin:4px 0; line-height:1; color:{color_prod};">{productividad_global:.2f}%</p>
-                <p style="font-size:11px; color:#d0d0d0; margin-top:4px;">Meta fija: {META_TOTAL_FILTRO} viajes (13 ops x 4{" x "+str(dias_filtro)+" días" if modo_vista!="Por Día" else ""})<br>{total_viajes_mostrar} / {META_TOTAL_FILTRO}</p>
+                <p style="font-size:11px; color:#d0d0d0; margin-top:4px;">Meta fija: {META_TOTAL_FILTRO} viajes (11 ops x 4{" x "+str(dias_filtro)+" días" if modo_vista!="Por Día" else ""})<br>{total_viajes_mostrar} / {META_TOTAL_FILTRO}</p>
                 <div style="width:50px; height:50px; background:{color_prod}; border-radius:50%; margin-top:10px; border:3px solid white; box-shadow:0 0 12px {color_prod};"></div>
             </div>
             ''', unsafe_allow_html=True)
@@ -400,7 +377,7 @@ elif menu == "🚛 Operadores Pesaje":
             st.plotly_chart(fig3, use_container_width=True)
             st.markdown("</div>", unsafe_allow_html=True)
 
-        st.markdown(f'<div class="gepp-card"><div class="gepp-header">🚨 OPERADORES SIN REGISTRO - {etiqueta_fecha} - 13 REALES (SIN KEVIN)</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="gepp-card"><div class="gepp-header">🚨 OPERADORES SIN REGISTRO - {etiqueta_fecha} - 12 REALES (FIX FUZZY CARLOS)</div>', unsafe_allow_html=True)
         catalogo_completo = load_catalogo_operadores()
         registrados_hoy = df_hoy[col_nombre].astype(str).str.strip().unique().tolist() if not df_hoy.empty else []
         def norm(s):
@@ -439,7 +416,7 @@ elif menu == "🚛 Operadores Pesaje":
                 st.balloons()
         st.markdown("</div>", unsafe_allow_html=True)
 
-        st.markdown(f'<div class="gepp-card"><div class="gepp-header">📊 PRODUCTIVIDAD - {etiqueta_fecha} - {productividad_global:.2f}% GLOBAL (13 OPS)</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="gepp-card"><div class="gepp-header">📊 PRODUCTIVIDAD - {etiqueta_fecha} - {productividad_global:.2f}% GLOBAL (11 OPS)</div>', unsafe_allow_html=True)
         if not prod_hoy.empty:
             fig_prod = px.bar(prod_hoy, x='Productividad_%', y='Operador', orientation='h', text='Productividad_%', color='Productividad_%', color_continuous_scale=['#ff0000','#ffcc00','#00b050'], range_color=[0,150])
             fig_prod.add_vline(x=100, line_dash="dash", line_color="green", annotation_text="100% = 4 viajes")
