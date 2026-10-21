@@ -39,14 +39,10 @@ def load():
     for col_fix in ["Hora Entrada", "Hora Salida"]:
         if col_fix in df.columns:
             try:
-                s = pd.to_datetime(df[col_fix], errors='coerce', utc=True)
-                if s.notna().any():
-                    s = s.dt.tz_convert(TZ_MEXICO).dt.tz_localize(None)
-                    df[col_fix] = s.dt.strftime('%I:%M:%S %p')
-                else:
-                    s2 = pd.to_datetime(df[col_fix], errors='coerce')
-                    df[col_fix] = (s2 - pd.Timedelta(hours=6)).dt.strftime('%I:%M:%S %p')
-            except: pass
+                s = pd.to_datetime(df[col_fix].astype(str).str.strip(), errors='coerce')
+                df[col_fix] = s.dt.strftime('%I:%M:%S %p')
+            except:
+                pass
     return df
 
 @st.cache_data(ttl=10)
@@ -314,9 +310,8 @@ elif menu == "🚛 Operadores Pesaje":
                     etiqueta_fecha = "TODO ACUMULADO"
                     dias_filtro = df_mostrar['fecha_solo'].nunique() if not df_mostrar.empty else 1
 
-        # === PRODUCTIVIDAD CON 11 FIJO ===
         TOTAL_OPS_FIJO = 11
-        META_TOTAL_DIA_FIJO = TOTAL_OPS_FIJO * META_DIARIA # 33
+        META_TOTAL_DIA_FIJO = TOTAL_OPS_FIJO * META_DIARIA
         if modo_vista == "Acumulado por Rango":
             META_TOTAL_FILTRO = META_TOTAL_DIA_FIJO * dias_filtro
         else:
@@ -341,7 +336,6 @@ elif menu == "🚛 Operadores Pesaje":
 
         productividad_global = (total_viajes_mostrar / META_TOTAL_FILTRO * 100) if META_TOTAL_FILTRO>0 else 0
 
-        # RECUADRO VERDE MAS GRANDE CON % GRANDE
         c1,c2,c3,c4 = st.columns([0.9,1.1,1.1,1.1])
         with c1:
             color_prod = "#00ff66" if productividad_global>=80 else "#ffcc00" if productividad_global>=40 else "#ff3333"
