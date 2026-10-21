@@ -10,7 +10,7 @@ import unicodedata
 import io
 
 TZ_MEXICO = pytz.timezone("America/Monterrey")
-st.set_page_config(page_title="Red Ambiental - V44.9 FIX ACENTOS", layout="wide", page_icon="♻️")
+st.set_page_config(page_title="Red Ambiental - V45.1 FIX ERROR + 13 OPS", layout="wide", page_icon="♻️")
 st.markdown("""
 <style>
 .stApp { background-color: #e9ecf2; }
@@ -26,41 +26,34 @@ URL_OPERADORES = "https://script.google.com/macros/s/AKfycbxfb7MVBqN_3xk5a9ICVa7
 
 @st.cache_data(ttl=60)
 def load():
-    df = None
-    # Intento 1 - como lo tenías originalmente
     try:
-        df = pd.read_csv(URL)
-    except Exception:
-        pass
-    # Intento 2 - con requests y cachebust (igual que operadores) para evitar el HTTPError de tu captura
-    if df is None:
         try:
-            url_retry = URL + f"&cachebust={datetime.now().strftime('%Y%m%d%H%M%S')}"
-            r = requests.get(url_retry, timeout=30, headers={"User-Agent": "Mozilla/5.0"})
+            df = pd.read_csv(URL)
+        except Exception:
+            r = requests.get(URL, timeout=30, headers={"User-Agent": "Mozilla/5.0"})
             r.raise_for_status()
             df = pd.read_csv(io.StringIO(r.text))
-        except Exception:
-            # Si falla todo, regresamos vacío para que NO salga el pantallazo rojo de tu captura
-            return pd.DataFrame(columns=["Fecha","Planta","Coordinador","¿Dentro?","Horas Trabajadas","Hora Entrada","Hora Salida","Nombre completo","Latitud","Longitud"])
-
-    df.columns = df.columns.str.strip()
-    df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
-    if 'Estatus Entrega' in df.columns: df = df.drop(columns=['Estatus Entrega'])
-    mapa = {"BAXTER": "Eduardo Vidal","POLOMEX": "Felix Najera","AMAZON MTY1": "Felix Najera","AMAZON MTY2": "Felix Najera","AMAZON MTY3": "Felix Najera","JUEGOS DEL VALLE": "Felix Najera","CELESTICA": "Felix Najera","CATERPILLAR CIENEGA": "Sergio Llanes"}
-    def get_coord(r):
-        c = str(r.get("Coordinador","")).strip()
-        if c.lower() not in ["","nan","none","sin asignar"]: return c
-        return mapa.get(str(r.get("Planta","")).upper().strip(), "SIN ASIGNAR")
-    if "Coordinador" not in df.columns: df["Coordinador"] = ""
-    df["Coordinador"] = df.apply(get_coord, axis=1)
-    for col_fix in ["Hora Entrada", "Hora Salida"]:
-        if col_fix in df.columns:
-            try:
-                s = pd.to_datetime(df[col_fix].astype(str).str.strip(), errors='coerce')
-                df[col_fix] = s.dt.strftime('%I:%M:%S %p')
-            except:
-                pass
-    return df
+        
+        df.columns = df.columns.str.strip()
+        df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
+        if 'Estatus Entrega' in df.columns: df = df.drop(columns=['Estatus Entrega'])
+        mapa = {"BAXTER": "Eduardo Vidal","POLOMEX": "Felix Najera","AMAZON MTY1": "Felix Najera","AMAZON MTY2": "Felix Najera","AMAZON MTY3": "Felix Najera","JUEGOS DEL VALLE": "Felix Najera","CELESTICA": "Felix Najera","CATERPILLAR CIENEGA": "Sergio Llanes"}
+        def get_coord(r):
+            c = str(r.get("Coordinador","")).strip()
+            if c.lower() not in ["","nan","none","sin asignar"]: return c
+            return mapa.get(str(r.get("Planta","")).upper().strip(), "SIN ASIGNAR")
+        if "Coordinador" not in df.columns: df["Coordinador"] = ""
+        df["Coordinador"] = df.apply(get_coord, axis=1)
+        for col_fix in ["Hora Entrada", "Hora Salida"]:
+            if col_fix in df.columns:
+                try:
+                    s = pd.to_datetime(df[col_fix].astype(str).str.strip(), errors='coerce')
+                    df[col_fix] = s.dt.strftime('%I:%M:%S %p')
+                except:
+                    pass
+        return df
+    except Exception as e:
+        return pd.DataFrame(columns=["Fecha","Planta","Coordinador","¿Dentro?","Horas Trabajadas","Hora Entrada","Hora Salida","Nombre completo"])
 
 @st.cache_data(ttl=10)
 def load_operadores():
@@ -92,7 +85,11 @@ def load_catalogo_operadores():
         "Luis Fernando Perez Castañeda"
     ]
 
-df_full = load()
+try:
+    df_full = load()
+except Exception as e:
+    st.warning(f"Error cargando asistencias: {e}")
+    df_full = pd.DataFrame()
 
 def render_zebra(df_to_show, max_h="340px"):
     html = f"""<style>.zebra-table{{width:100%;border-collapse:collapse;font-size:11px;font-family:Arial;}}.zebra-table th{{background:#0f3d1f;color:white;padding:8px;text-align:left;position:sticky;top:0;z-index:2;}}.zebra-table td{{padding:7px 8px;border-bottom:1px solid #e0e0e0;}}.zebra-table tr:nth-child(even){{background:#f2f4f7;}}.zebra-table tr:nth-child(odd){{background:#ffffff;}}.zebra-table tr:hover{{background:#d1e7dd!important;}}.badge-dentro{{background:#00b050;color:white;padding:2px 6px;border-radius:10px;font-weight:bold;font-size:10px;}}.badge-fuera{{background:#ff0000;color:white;padding:2px 6px;border-radius:10px;font-weight:bold;font-size:10px;}}.badge-excelente{{background:#00b050;color:white;padding:2px 6px;border-radius:10px;font-weight:bold;font-size:10px;}}.badge-bueno{{background:#ffcc00;color:black;padding:2px 6px;border-radius:10px;font-weight:bold;font-size:10px;}}.badge-malo{{background:#ff0000;color:white;padding:2px 6px;border-radius:10px;font-weight:bold;font-size:10px;}}</style><div style="max-height:{max_h}; overflow:auto; background:white; border-radius:0 0 6px 6px;"><table class="zebra-table"><thead><tr>"""
@@ -137,13 +134,14 @@ with st.sidebar:
         coord_sel = st.selectbox("Coordinador", coords)
         dentro_sel = st.selectbox("¿Dentro?", ["Todos","DENTRO","FUERA"])
     else:
-        fecha_sel = None; planta_sel = "Todas"; coord_sel = "Todos"; dentro_sel = "Todos"
+        fecha_sel = None
+        planta_sel = "Todas"
+        coord_sel = "Todos"
+        dentro_sel = "Todos"
 
 if menu == "📊 Dashboard Asistencias":
     if df_full.empty:
-        st.warning("⚠️ Google Sheets de Asistencias está tardando en responder. Dale clic a ACTUALIZAR TODO y espera 10 seg. El de Operadores sigue jalando normal.")
-        if st.button("🔄 Reintentar cargar asistencias"):
-            st.cache_data.clear(); st.rerun()
+        st.warning("⚠️ No se pudo cargar asistencias en este momento. El módulo de Operadores sigue funcionando. Dale a ACTUALIZAR TODO.")
         st.stop()
     df = df_full.copy()
     if fecha_sel and isinstance(fecha_sel, tuple) and len(fecha_sel)==2:
