@@ -80,37 +80,47 @@ def load_catalogo_operadores():
     ]
 
 # --- FUNCIONES SOLO PARA BOLETA OFICIAL 2001-0098816 ---
-def get_image_hash(file_bytes):
-    return hashlib.md5(file_bytes).hexdigest()
+def mejorar_imagen_para_ocr(img_pil):
+    # Mejora para tu boleta oficial - más nitida
+    img = img_pil.convert('L') # gris
+    w, h = img.size
+    img = img.resize((w*2, h*2)) # agrandar 2x para que lea FOLIO:
+    return img
 
 def extraer_fecha_de_imagen(img_pil):
     try:
-        texto = pytesseract.image_to_string(img_pil, lang='spa+eng')
+        img = mejorar_imagen_para_ocr(img_pil)
+        # PSM 6 = bloque de texto - jala mejor para boletas
+        texto = pytesseract.image_to_string(img, lang='spa+eng', config='--psm 6')
         texto_up = texto.upper()
-        # Formato oficial: Fecha E: 21/10/2026
-        patron_fecha = re.findall(r'FECHA\s*[ES]:\s*(\d{1,2}/\d{1,2}/\d{4})', texto_up)
-        if patron_fecha:
-            f = pd.to_datetime(patron_fecha[0], dayfirst=True, errors='coerce')
-            if pd.notna(f): return f.date(), patron_fecha[0], texto
-        patron1 = re.search(r'(\d{1,2}/\d{1,2}/\d{4})', texto_up)
-        if patron1:
-            f = pd.to_datetime(patron1.group(1), dayfirst=True, errors='coerce')
-            if pd.notna(f): return f.date(), patron1.group(1), texto
+        # Tu formato exacto: FECHA E: 21/10/2026  y FECHA S: 21/10/2026
+        patron = re.findall(r'FECHA\s*[ES]:\s*(\d{1,2}/\d{1,2}/\d{4})', texto_up)
+        if patron:
+            f = pd.to_datetime(patron[0], dayfirst=True, errors='coerce')
+            if pd.notna(f): return f.date(), patron[0], texto
+        patron2 = re.search(r'(\d{1,2}/\d{1,2}/\d{4})', texto_up)
+        if patron2:
+            f = pd.to_datetime(patron2.group(1), dayfirst=True, errors='coerce')
+            if pd.notna(f): return f.date(), patron2.group(1), texto
         return None, None, texto
     except Exception as e:
         return None, f"Error {e}", ""
 
 def extraer_folio_boleta(img_pil):
     try:
-        texto = pytesseract.image_to_string(img_pil, lang='spa+eng')
-        texto_up = texto.upper()
-        m = re.search(r'FOLIO:\s*([0-9\-]+)', texto_up)
+        img = mejorar_imagen_para_ocr(img_pil)
+        texto = pytesseract.image_to_string(img, lang='spa+eng', config='--psm 6')
+        texto_up = texto.upper().replace('O','0') # confunde O con 0
+        # Busca FOLIO: 2001-0098816 con guion
+        m = re.search(r'FOLIO[:\s]*([0-9\-]{5,20})', texto_up)
         if m:
-            return m.group(1).strip(), texto
+            folio = m.group(1).replace(' ','').strip()
+            # limpia
+            folio = re.sub(r'[^0-9\-]', '', folio)
+            return folio, texto
         return None, texto
     except:
         return None, ""
-
 df_full = load()
 
 def render_zebra(df_to_show, max_h="340px"):
