@@ -4,7 +4,7 @@ import plotly.graph_objects as go
 import plotly.express as px
 import streamlit.components.v1 as components
 import requests, base64
-from datetime import datetime
+from datetime import datetime, date
 import pytz
 import unicodedata
 import re
@@ -79,21 +79,21 @@ def load_catalogo_operadores():
         "Luis Fernando Perez Castañeda"
     ]
 
-# --- FUNCIONES SOLO PARA BOLETA OFICIAL 2001-0098816 ---
+# --- FUNCIONES BOLETA OFICIAL 2001-0098816 - FIX DUPLICADO ---
+def get_image_hash(file_bytes):
+    return hashlib.sha256(file_bytes).hexdigest()
+
 def mejorar_imagen_para_ocr(img_pil):
-    # Mejora para tu boleta oficial - más nitida
-    img = img_pil.convert('L') # gris
+    img = img_pil.convert('L')
     w, h = img.size
-    img = img.resize((w*2, h*2)) # agrandar 2x para que lea FOLIO:
+    img = img.resize((w*2, h*2))
     return img
 
 def extraer_fecha_de_imagen(img_pil):
     try:
         img = mejorar_imagen_para_ocr(img_pil)
-        # PSM 6 = bloque de texto - jala mejor para boletas
         texto = pytesseract.image_to_string(img, lang='spa+eng', config='--psm 6')
         texto_up = texto.upper()
-        # Tu formato exacto: FECHA E: 21/10/2026  y FECHA S: 21/10/2026
         patron = re.findall(r'FECHA\s*[ES]:\s*(\d{1,2}/\d{1,2}/\d{4})', texto_up)
         if patron:
             f = pd.to_datetime(patron[0], dayfirst=True, errors='coerce')
@@ -110,17 +110,20 @@ def extraer_folio_boleta(img_pil):
     try:
         img = mejorar_imagen_para_ocr(img_pil)
         texto = pytesseract.image_to_string(img, lang='spa+eng', config='--psm 6')
-        texto_up = texto.upper().replace('O','0') # confunde O con 0
-        # Busca FOLIO: 2001-0098816 con guion
+        texto_up = texto.upper().replace('O','0')
         m = re.search(r'FOLIO[:\s]*([0-9\-]{5,20})', texto_up)
         if m:
             folio = m.group(1).replace(' ','').strip()
-            # limpia
             folio = re.sub(r'[^0-9\-]', '', folio)
             return folio, texto
+        # intento 2 sin palabra FOLIO, solo patrón 2001-xxxxxx
+        m2 = re.search(r'(2001-[0-9]{5,10})', texto_up)
+        if m2:
+            return m2.group(1), texto
         return None, texto
     except:
         return None, ""
+
 df_full = load()
 
 def render_zebra(df_to_show, max_h="340px"):
@@ -302,6 +305,7 @@ elif menu == "🚛 Operadores Pesaje":
         fecha_valida = False
         folio_detectado = None
         hash_imagen = None
+        folio_valido = True
 
         if foto:
             st.image(foto, caption="Vista previa boleta", width=350)
@@ -311,27 +315,30 @@ elif menu == "🚛 Operadores Pesaje":
                 try:
                     img_pil = Image.open(foto)
                     fecha_boleta, fecha_texto, _ = extraer_fecha_de_imagen(img_pil)
-                    folio_detectado, _ = extraer_folio_boleta(img_pil)
+                    folio_temp, _ = extraer_folio_boleta(img_pil)
+                    folio_detectado = folio_temp
                     hoy_mty = datetime.now(TZ_MEXICO).date()
 
                     if folio_detectado:
                         st.info(f"📄 Folio detectado: {folio_detectado} | Hash: {hash_imagen[:8]}")
+                    else:
+                        st.warning("⚠️ No detecté FOLIO automático, escríbelo abajo")
 
-                    # --- BLOQUEO DUPLICADO ---
+                    # --- BLOQUEO DUPLICADO MEJORADO ---
                     try:
                         df_check = load_operadores()
-                        col_hash = [c for c in df_check.columns if 'hash' in c.lower()]
-                        col_folio = [c for c in df_check.columns if 'folio' in c.lower()]
+                        # busca en cualquier columna si existe ese folio o hash
+                        todo_texto = df_check.astype(str).values.flatten()
+                        todo_joined = " ".join(todo_texto)
                         
-                        if col_hash and not df_check.empty and hash_imagen in df_check[col_hash[0]].astype(str).values:
-                            st.error(f"❌ ESTA BOLETA YA HA SIDO REGISTRADA - Hash duplicado")
-                            st.stop()
-                        
-                        if col_folio and folio_detectado and not df_check.empty:
-                            if folio_detectado in df_check[col_folio[0]].astype(str).values:
-                                dup = df_check[df_check[col_folio[0]].astype(str)==str(folio_detectado)].iloc[0]
-                                st.error(f"❌ ESTA BOLETA YA HA SIDO REGISTRADA - Folio {folio_detectado} ya fue registrado")
-                                st.stop()
+                        if folio_detectado and folio_detectado in todo_joined:
+                            st.error(f"❌ ESTA BOLETA YA HA SIDO REGISTRADA - Folio {folio_detectado} ya existe en tu Sheet")
+                            folio_valido = False
+                            fecha_valida = False
+                        elif hash_imagen and hash_imagen in todo_joined:
+                            st.error(f"❌ ESTA BOLETA YA HA SIDO REGISTRADA - Imagen duplicada")
+                            folio_valido = False
+                            fecha_valida = False
                     except Exception as e:
                         pass
 
@@ -341,8 +348,9 @@ elif menu == "🚛 Operadores Pesaje":
                             st.error(f"❌ BOLETA NO ES DE HOY. Dice {fecha_boleta.strftime('%d/%m/%Y')} y hoy es {hoy_mty.strftime('%d/%m/%Y')}")
                             fecha_valida = False
                         else:
-                            st.success(f"✅ Boleta válida de hoy ({fecha_texto}) - Folio {folio_detectado or 'N/A'}")
-                            fecha_valida = True
+                            if folio_valido:
+                                st.success(f"✅ Boleta válida de hoy ({fecha_texto}) - Folio {folio_detectado or 'pendiente'}")
+                                fecha_valida = True
                     else:
                         st.warning("⚠️ No pude leer Fecha E: - Toma foto más nítida donde se vea FECHA E")
                         fecha_valida = False
@@ -350,11 +358,32 @@ elif menu == "🚛 Operadores Pesaje":
                     st.error(f"Error leyendo imagen: {e}")
                     fecha_valida = False
 
+        # Campo manual para folio si no se leyó
+        if foto and not folio_detectado:
+            folio_manual = st.text_input("✍️ Escribe FOLIO manualmente (ej: 2001-0098816)", key="folio_manual_input")
+            if folio_manual:
+                folio_detectado = folio_manual.strip()
+                st.info(f"📄 Usando folio manual: {folio_detectado}")
+                # revalidar duplicado con manual
+                try:
+                    df_check = load_operadores()
+                    todo_joined = " ".join(df_check.astype(str).values.flatten())
+                    if folio_detectado in todo_joined:
+                        st.error(f"❌ ESTA BOLETA YA HA SIDO REGISTRADA - Folio {folio_detectado}")
+                        folio_valido = False
+                        fecha_valida = False
+                except:
+                    pass
+
         if st.button("💾 Guardar Registro Operador", type="primary", use_container_width=True):
             if not nombre or not unidad or not base or not foto:
                 st.error("❌ Complete todos los campos obligatorios")
+            elif not folio_detectado:
+                st.error("❌ Debes tener FOLIO. Escribe el folio manual de la boleta")
+            elif not folio_valido:
+                st.error(f"❌ No se puede guardar - ESTA BOLETA YA HA SIDO REGISTRADA - Folio {folio_detectado}")
             elif not fecha_valida:
-                st.error(f"❌ No se puede guardar. La boleta debe ser del día de hoy ({datetime.now(TZ_MEXICO).date().strftime('%d/%m/%Y')}) y folio no duplicado")
+                st.error(f"❌ No se puede guardar. La boleta debe ser del día de hoy ({datetime.now(TZ_MEXICO).date().strftime('%d/%m/%Y')})")
             else:
                 with st.spinner("Procesando..."):
                     b64 = base64.b64encode(foto.getvalue()).decode('utf-8')
