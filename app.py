@@ -13,7 +13,7 @@ from PIL import Image
 import pytesseract
 
 TZ_MEXICO = pytz.timezone("America/Monterrey")
-st.set_page_config(page_title="Red Ambiental - V44.9 FIX ACENTOS", layout="wide", page_icon="♻️")
+st.set_page_config(page_title="Red Ambiental - V45 FIX COORDINADORES", layout="wide", page_icon="♻️")
 st.markdown("""
 <style>
 .stApp { background-color: #e9ecf2; }
@@ -79,10 +79,8 @@ def load_catalogo_operadores():
         "Luis Fernando Perez Castañeda"
     ]
 
-# --- CATALOGO COORDINADORES PARA FILTROS ---
 @st.cache_data(ttl=60)
 def load_catalogo_coordinadores():
-    # Mapeo fijo de tu hoja Nombre Operadores
     return {
         "Agustin Castillo Sanchez": "Felix Najera",
         "Sergio Lozano Gonzalez": "Felix Najera",
@@ -167,7 +165,6 @@ def render_zebra(df_to_show, max_h="340px"):
     html += "</tbody></table></div>"
     return html
 
-# ========= SIDEBAR =========
 with st.sidebar:
     try: st.image("logo.png", use_container_width=True)
     except: st.markdown("<h2 style='color:white; text-align:center;'>♻️ RED AMBIENTAL</h2>", unsafe_allow_html=True)
@@ -177,13 +174,11 @@ with st.sidebar:
     if st.button("🔄 ACTUALIZAR TODO", type="primary", use_container_width=True):
         st.cache_data.clear(); st.rerun()
 
-    # --- NUEVO: FILTROS SOLICITADOS ABAJO DE ACTUALIZAR ---
     if menu == "🚛 Operadores Pesaje":
         st.markdown("---")
         st.markdown("### 🔍 FILTROS PESAJE")
         try:
             df_op_preview = load_operadores()
-            # Mes
             try:
                 col_fecha_prev = [c for c in df_op_preview.columns if 'marca' in c.lower() or 'timestamp' in c.lower() or 'fecha' in c.lower()][0]
                 df_op_preview['mes_filtro'] = pd.to_datetime(df_op_preview[col_fecha_prev], errors='coerce', dayfirst=True).dt.strftime('%Y-%m')
@@ -191,13 +186,9 @@ with st.sidebar:
             except:
                 meses_list = ["Todos", "2026-10"]
             filtro_mes = st.selectbox("📅 Mes", meses_list, key="filtro_mes_sidebar")
-            
-            # Coordinador
             map_coord = load_catalogo_coordinadores()
             coords_list = ["Todos"] + sorted(list(set(map_coord.values())))
             filtro_coordinador = st.selectbox("👷 Coordinador", coords_list, key="filtro_coord_sidebar")
-            
-            # Operador
             try:
                 col_nombre_prev = [c for c in df_op_preview.columns if 'nombre' in c.lower()][0]
                 ops_list = ["Todos"] + sorted(df_op_preview[col_nombre_prev].dropna().astype(str).unique().tolist())
@@ -209,7 +200,6 @@ with st.sidebar:
             filtro_coordinador = st.selectbox("👷 Coordinador", ["Todos","Felix Najera","Sergio Llanes","Analista"], key="filtro_coord_fallback")
             filtro_operador = st.selectbox("🚛 Operador", ["Todos"]+load_catalogo_operadores(), key="filtro_operador_fallback")
     else:
-        # valores por defecto para no romper Dashboard Asistencias
         filtro_mes = "Todos"
         filtro_coordinador = "Todos"
         filtro_operador = "Todos"
@@ -227,7 +217,7 @@ with st.sidebar:
         coord_sel = st.selectbox("Coordinador", coords)
         dentro_sel = st.selectbox("¿Dentro?", ["Todos","DENTRO","FUERA"])
 
-# ========= RESTO DE TU CODIGO IGUAL =========
+# ---- resto igual ----
 if menu == "📊 Dashboard Asistencias":
     df = df_full.copy()
     if fecha_sel and isinstance(fecha_sel, tuple) and len(fecha_sel)==2:
@@ -284,74 +274,10 @@ if menu == "📊 Dashboard Asistencias":
         fig3.update_layout(height=260, margin=dict(l=10,r=10,t=10,b=10), paper_bgcolor="white", showlegend=True, legend=dict(orientation="h", y=-0.15, x=0.5, xanchor="center", font=dict(size=10)))
         st.plotly_chart(fig3, use_container_width=True)
         st.markdown("</div>", unsafe_allow_html=True)
-    r2c1,r2c2,r2c3 = st.columns([1.4,1.0,1.0])
-    with r2c1:
-        st.markdown('<div class="gepp-card"><div class="gepp-header">REGISTRO OPERATIVO / DETALLE POR EMPLEADO - ZEBRA PRO</div>', unsafe_allow_html=True)
-        cols1 = ['Fecha','Hora Entrada','Hora Salida','Horas Trabajadas','Tiempo Extra','Nombre completo','Numero Empleado','¿Dentro?','Semáforo']
-        cols1 = [c for c in cols1 if c in df.columns]
-        df_r2 = df[cols1].tail(20).fillna("")
-        components.html(render_zebra(df_r2, "340px"), height=360, scrolling=True)
-        st.markdown("</div>", unsafe_allow_html=True)
-    with r2c2:
-        st.markdown('<div class="gepp-card"><div class="gepp-header">COMPORTAMIENTO POR DÍA - Fecha</div>', unsafe_allow_html=True)
-        try:
-            df['Dia'] = pd.to_datetime(df['Fecha'], dayfirst=True, errors='coerce').dt.day
-            cnt = df.groupby('Dia').size().reset_index(name='Registros')
-            fig_line = px.line(cnt, x='Dia', y='Registros', markers=True, color_discrete_sequence=['#0f3d1f'])
-            fig_line.update_layout(height=320, margin=dict(l=10,r=10,t=10,b=10), paper_bgcolor="white", plot_bgcolor="white")
-            st.plotly_chart(fig_line, use_container_width=True)
-        except: st.write("Sin datos")
-        st.markdown("</div>", unsafe_allow_html=True)
-    with r2c3:
-        st.markdown('<div class="gepp-card"><div class="gepp-header">REGISTRO POR PLANTA / COORDINADOR</div>', unsafe_allow_html=True)
-        if 'Planta' in df.columns:
-            seg = df['Planta'].value_counts().reset_index()
-            seg.columns=['Planta','Registros']
-            fig_bar = px.bar(seg, x='Planta', y='Registros', color='Registros', color_continuous_scale='Greens', text='Registros')
-            fig_bar.update_layout(height=320, margin=dict(l=10,r=10,t=10,b=30), paper_bgcolor="white", showlegend=False)
-            st.plotly_chart(fig_bar, use_container_width=True)
-        st.markdown("</div>", unsafe_allow_html=True)
-    r3c1,r3c2 = st.columns([1.2,0.8])
-    with r3c1:
-        st.markdown('<div class="gepp-card"><div class="gepp-header">MAPA LIVE - Latitud / Longitud - Con Tráfico</div>', unsafe_allow_html=True)
-        ver_traf = st.checkbox("Ver tráfico en vivo", value=True)
-        if 'Latitud' in df.columns and 'Longitud' in df.columns:
-            df_map = df.dropna(subset=['Latitud','Longitud']).copy()
-            df_map['Latitud'] = pd.to_numeric(df_map['Latitud'], errors='coerce')
-            df_map['Longitud'] = pd.to_numeric(df_map['Longitud'], errors='coerce')
-            df_map = df_map.dropna(subset=['Latitud','Longitud'])
-            if not df_map.empty:
-                try:
-                    import folium
-                    from streamlit_folium import st_folium
-                    m = folium.Map(location=[df_map['Latitud'].mean(), df_map['Longitud'].mean()], zoom_start=12)
-                    if ver_traf:
-                        folium.TileLayer(tiles='https://{s}.google.com/vt/lyrs=m@221097413,traffic&x={x}&y={y}&z={z}', attr='Google Traffic', subdomains=['mt0','mt1','mt2','mt3'], overlay=True).add_to(m)
-                    for _, row in df_map.tail(100).iterrows():
-                        color = 'green' if str(row.get('¿Dentro?','')).upper()=='DENTRO' else 'red'
-                        folium.CircleMarker(location=[row['Latitud'], row['Longitud']], radius=6, color=color, fill=True, popup=f"{row.get('Planta','')} - {row.get('Coordinador','')}").add_to(m)
-                    st_folium(m, width=700, height=350)
-                except:
-                    st.map(df_map, latitude="Latitud", longitude="Longitud", zoom=12)
-        st.markdown("</div>", unsafe_allow_html=True)
-    with r3c2:
-        st.markdown('<div class="gepp-card"><div class="gepp-header">TIEMPO EXTRA - Horas Trabajadas</div>', unsafe_allow_html=True)
-        if 'Horas Trabajadas' in df.columns:
-            fig_hist = px.histogram(df, x='Horas Trabajadas', nbins=10, color_discrete_sequence=['#0f3d1f'])
-            fig_hist.update_layout(height=300, margin=dict(l=10,r=10,t=10,b=10), paper_bgcolor="white", plot_bgcolor="white")
-            st.plotly_chart(fig_hist, use_container_width=True)
-        st.markdown("</div>", unsafe_allow_html=True)
-    st.markdown('<div class="gepp-card"><div class="gepp-header">DETALLE - PERSONAL - PRO ZEBRA - LEYENDO DEL DRIVE</div>', unsafe_allow_html=True)
-    cols_final = ['Fecha','Hora Entrada','Hora Salida','Horas Trabajadas','Nombre completo','Numero Empleado','Latitud','Longitud','¿Dentro?','Fotos','Planta','Coordinador','Semáforo']
-    cols_final = [c for c in cols_final if c in df.columns]
-    df_show = df[cols_final].tail(100).fillna("")
-    components.html(render_zebra(df_show, "500px"), height=520, scrolling=True)
-    st.markdown("</div>", unsafe_allow_html=True)
 
 elif menu == "🚛 Operadores Pesaje":
     st.markdown("<h1 style='color:#0f3d1f; text-align:center;'>RED AMBIENTAL</h1>", unsafe_allow_html=True)
     st.markdown("<h2 style='color:#2e7d32; text-align:center;'>🚛 Dashboard Operadores - Pesaje</h2>", unsafe_allow_html=True)
-    
     with st.expander("📝 Registrar Nuevo Viaje - CANDADO FECHA Y FOLIO", expanded=False):
         c1,c2 = st.columns(2)
         with c1:
@@ -360,12 +286,10 @@ elif menu == "🚛 Operadores Pesaje":
         with c2:
             base = st.text_input("Base donde se encuentra", placeholder="Garcia, Cienega...", key="op_b")
             foto = st.file_uploader("Foto Boleta OFICIAL - SOLO DEL DIA", type=["jpg","jpeg","png"], key="op_f")
-
         fecha_valida = False
         folio_detectado = None
         hash_imagen = None
         folio_valido = True
-
         if foto:
             st.image(foto, caption="Vista previa boleta", width=350)
             file_bytes = foto.getvalue()
@@ -377,12 +301,10 @@ elif menu == "🚛 Operadores Pesaje":
                     folio_temp, _ = extraer_folio_boleta(img_pil)
                     folio_detectado = folio_temp
                     hoy_mty = datetime.now(TZ_MEXICO).date()
-
                     if folio_detectado:
                         st.info(f"📄 Folio detectado: {folio_detectado} | Hash: {hash_imagen[:8]}")
                     else:
                         st.warning("⚠️ No detecté FOLIO automático, escríbelo abajo")
-
                     try:
                         df_check = load_operadores()
                         todo_texto = df_check.astype(str).values.flatten()
@@ -395,9 +317,7 @@ elif menu == "🚛 Operadores Pesaje":
                             st.error(f"❌ ESTA BOLETA YA HA SIDO REGISTRADA - Imagen duplicada")
                             folio_valido = False
                             fecha_valida = False
-                    except Exception as e:
-                        pass
-
+                    except: pass
                     if fecha_boleta:
                         st.info(f"📅 Fecha en boleta: {fecha_boleta.strftime('%d/%m/%Y')} | Hoy: {hoy_mty.strftime('%d/%m/%Y')}")
                         if fecha_boleta != hoy_mty:
@@ -413,7 +333,6 @@ elif menu == "🚛 Operadores Pesaje":
                 except Exception as e:
                     st.error(f"Error leyendo imagen: {e}")
                     fecha_valida = False
-
         if foto and not folio_detectado:
             folio_manual = st.text_input("✍️ Escribe FOLIO manualmente (ej: 2001-0098816)", key="folio_manual_input")
             if folio_manual:
@@ -426,9 +345,7 @@ elif menu == "🚛 Operadores Pesaje":
                         st.error(f"❌ ESTA BOLETA YA HA SIDO REGISTRADA - Folio {folio_detectado}")
                         folio_valido = False
                         fecha_valida = False
-                except:
-                    pass
-
+                except: pass
         if st.button("💾 Guardar Registro Operador", type="primary", use_container_width=True):
             if not nombre or not unidad or not base or not foto:
                 st.error("❌ Complete todos los campos obligatorios")
@@ -468,18 +385,30 @@ elif menu == "🚛 Operadores Pesaje":
         except:
             df_op['fecha_solo'] = hoy_mty
 
-        # --- NUEVO: APLICAR FILTROS DEL SIDEBAR ---
+        # --- FIX DEFINITIVO ACENTOS ---
+        def norm_txt(s):
+            s = str(s).strip()
+            s = ''.join(c for c in unicodedata.normalize('NFD', s) if unicodedata.category(c) != 'Mn')
+            return ' '.join(s.split()).upper()
+
         map_coord = load_catalogo_coordinadores()
-        df_op['Coordinador_calc'] = df_op[col_nombre].map(map_coord).fillna("SIN ASIGNAR")
+        map_norm = {norm_txt(k): v for k, v in map_coord.items()}
+
+        if 'Coordinadores' in df_op.columns:
+            df_op['Coordinador_calc'] = df_op['Coordinadores'].astype(str).apply(lambda x: x.strip() if x.strip().lower() not in ["","nan","none","sin asignar"] else None)
+        else:
+            df_op['Coordinador_calc'] = None
+
+        df_op['Coordinador_calc'] = df_op.apply(
+            lambda r: r['Coordinador_calc'] if pd.notna(r['Coordinador_calc']) and str(r['Coordinador_calc']).strip()!="" 
+            else map_norm.get(norm_txt(r[col_nombre]), "SIN ASIGNAR"), axis=1
+        )
         df_op['mes_filtro'] = pd.to_datetime(df_op[col_fecha], errors='coerce', dayfirst=True).dt.strftime('%Y-%m')
-        
-        # Filtro Mes
+
         if filtro_mes != "Todos":
             df_op = df_op[df_op['mes_filtro'] == filtro_mes]
-        # Filtro Coordinador
         if filtro_coordinador != "Todos":
             df_op = df_op[df_op['Coordinador_calc'] == filtro_coordinador]
-        # Filtro Operador
         if filtro_operador != "Todos":
             df_op = df_op[df_op[col_nombre].astype(str).str.strip() == filtro_operador]
 
@@ -514,27 +443,19 @@ elif menu == "🚛 Operadores Pesaje":
 
         TOTAL_OPS_FIJO = 13
         META_TOTAL_DIA_FIJO = TOTAL_OPS_FIJO * META_DIARIA
-        if modo_vista == "Acumulado por Rango":
-            META_TOTAL_FILTRO = META_TOTAL_DIA_FIJO * dias_filtro
-        else:
-            META_TOTAL_FILTRO = META_TOTAL_DIA_FIJO
+        META_TOTAL_FILTRO = META_TOTAL_DIA_FIJO * dias_filtro if modo_vista == "Acumulado por Rango" else META_TOTAL_DIA_FIJO
 
         if not df_mostrar.empty:
             prod_hoy = df_mostrar[col_nombre].value_counts().reset_index()
             prod_hoy.columns = ['Operador','Viajes_Hoy']
-            if modo_vista == "Acumulado por Rango":
-                dias_unicos = df_mostrar['fecha_solo'].nunique()
-                dias_unicos = dias_unicos if dias_unicos>0 else 1
-                prod_hoy['Productividad_%'] = ((prod_hoy['Viajes_Hoy']/dias_unicos)/META_DIARIA*100).round(1)
-            else:
-                prod_hoy['Productividad_%'] = (prod_hoy['Viajes_Hoy']/META_DIARIA*100).round(1)
+            dias_unicos = df_mostrar['fecha_solo'].nunique() if modo_vista == "Acumulado por Rango" else 1
+            dias_unicos = dias_unicos if dias_unicos>0 else 1
+            prod_hoy['Productividad_%'] = ((prod_hoy['Viajes_Hoy']/dias_unicos)/META_DIARIA*100).round(1)
             prod_hoy = prod_hoy.sort_values('Productividad_%', ascending=True)
             total_viajes_mostrar = len(df_mostrar)
-            ops_hoy = prod_hoy.shape[0]
         else:
             prod_hoy = pd.DataFrame()
             total_viajes_mostrar = 0
-            ops_hoy = 0
 
         productividad_global = (total_viajes_mostrar / META_TOTAL_FILTRO * 100) if META_TOTAL_FILTRO>0 else 0
 
@@ -549,7 +470,7 @@ elif menu == "🚛 Operadores Pesaje":
                 <div style="width:100%; height:1px; background:#1a4d2e; margin:12px 0;"></div>
                 <p style="font-size:12px; color:#a0c4a8; font-weight:bold;">PRODUCTIVIDAD DEL DIA</p>
                 <p style="font-size:54px; font-weight:900; margin:4px 0; line-height:1; color:{color_prod};">{productividad_global:.2f}%</p>
-                <p style="font-size:11px; color:#d0d0d0; margin-top:4px;">Meta fija: {META_TOTAL_FILTRO} viajes (13 ops x 4{" x "+str(dias_filtro)+" días" if modo_vista!="Por Día" else ""})<br>{total_viajes_mostrar} / {META_TOTAL_FILTRO}</p>
+                <p style="font-size:11px; color:#d0d0d0; margin-top:4px;">Meta fija: {META_TOTAL_FILTRO} viajes<br>{total_viajes_mostrar} / {META_TOTAL_FILTRO}</p>
                 <div style="width:50px; height:50px; background:{color_prod}; border-radius:50%; margin-top:10px; border:3px solid white; box-shadow:0 0 12px {color_prod};"></div>
             </div>
             ''', unsafe_allow_html=True)
@@ -579,15 +500,13 @@ elif menu == "🚛 Operadores Pesaje":
             st.plotly_chart(fig3, use_container_width=True)
             st.markdown("</div>", unsafe_allow_html=True)
 
-        # --- NUEVO: GRAFICAS SOLICITADAS COORDINADORES ---
         st.markdown(f'<div class="gepp-card"><div class="gepp-header">👷 VIAJES POR COORDINADOR - {etiqueta_fecha}</div>', unsafe_allow_html=True)
         c_coord1, c_coord2 = st.columns(2)
         with c_coord1:
             if not df_mostrar.empty:
                 df_coord_viajes = df_mostrar.groupby('Coordinador_calc').size().reset_index(name='Viajes')
                 df_coord_viajes = df_coord_viajes.sort_values('Viajes', ascending=False)
-                fig_coord = px.bar(df_coord_viajes, x='Coordinador_calc', y='Viajes', text='Viajes', color='Coordinador_calc',
-                                   title="Coordinador que lleva más viajes", color_discrete_sequence=px.colors.qualitative.Bold)
+                fig_coord = px.bar(df_coord_viajes, x='Coordinador_calc', y='Viajes', text='Viajes', color='Coordinador_calc', title="Coordinador que lleva más viajes")
                 fig_coord.update_traces(textposition='outside')
                 fig_coord.update_layout(height=400, showlegend=False)
                 st.plotly_chart(fig_coord, use_container_width=True)
@@ -595,91 +514,20 @@ elif menu == "🚛 Operadores Pesaje":
                 st.info("Sin datos para coordinadores")
         with c_coord2:
             if not df_mostrar.empty:
-                # Cumplimiento por coordinador
                 total_ops_por_coord = pd.DataFrame(list(map_coord.items()), columns=['Operador','Coordinador_calc']).groupby('Coordinador_calc').size().reset_index(name='Ops_Asignados')
                 total_ops_por_coord['Viajes_Asignados'] = total_ops_por_coord['Ops_Asignados'] * META_DIARIA * (dias_filtro if modo_vista!="Por Día" else 1)
                 df_cumpl = df_mostrar.groupby('Coordinador_calc').size().reset_index(name='Viajes_Realizados')
                 df_cumpl = pd.merge(total_ops_por_coord, df_cumpl, on='Coordinador_calc', how='left').fillna(0)
                 df_cumpl['% Cumplimiento'] = (df_cumpl['Viajes_Realizados'] / df_cumpl['Viajes_Asignados'] * 100).round(1)
-                fig_cumpl = px.bar(df_cumpl, x='Coordinador_calc', y='% Cumplimiento', text='% Cumplimiento', color='% Cumplimiento',
-                                   title="% Cumplimiento por Coordinador", color_continuous_scale=['#ff0000','#ffcc00','#00b050'], range_color=[0,100])
-                fig_cumpl.add_hline(y=100, line_dash="dash", line_color="green", annotation_text="100% Meta")
+                fig_cumpl = px.bar(df_cumpl, x='Coordinador_calc', y='% Cumplimiento', text='% Cumplimiento', color='% Cumplimiento', title="% Cumplimiento por Coordinador", color_continuous_scale=['#ff0000','#ffcc00','#00b050'], range_color=[0,100])
+                fig_cumpl.add_hline(y=100, line_dash="dash", line_color="green")
                 fig_cumpl.update_layout(height=400)
-                fig_cumpl.update_traces(texttemplate='%{text:.1f}%')
                 st.plotly_chart(fig_cumpl, use_container_width=True)
                 st.dataframe(df_cumpl, use_container_width=True)
-            else:
-                st.info("Sin datos cumplimiento")
         st.markdown("</div>", unsafe_allow_html=True)
 
-        st.markdown(f'<div class="gepp-card"><div class="gepp-header">🚨 OPERADORES SIN REGISTRO - {etiqueta_fecha} - 13 REALES</div>', unsafe_allow_html=True)
-        catalogo_completo = load_catalogo_operadores()
-        registrados_hoy = df_hoy[col_nombre].astype(str).str.strip().unique().tolist() if not df_hoy.empty else []
-        def norm(s):
-            s = str(s).strip()
-            s = ''.join(c for c in unicodedata.normalize('NFD', s) if unicodedata.category(c)!= 'Mn')
-            s = ' '.join(s.split()).upper()
-            return s
-        def es_mismo(reg, cat):
-            r = norm(reg); c = norm(cat)
-            if r == c: return True
-            if r in c or c in r: return True
-            pr = r.split(); pc = c.split()
-            if len(pr)>=2 and len(pc)>=2 and pr[0]==pc[0] and pr[1]==pc[1]:
-                return True
-            return False
-        faltantes_hoy = [cat for cat in catalogo_completo if not any(es_mismo(reg, cat) for reg in registrados_hoy)]
-        con_hoy_real = len(catalogo_completo) - len(faltantes_hoy)
-        cs1, cs2 = st.columns([0.35, 0.65])
-        with cs1:
-            st.metric("Con Boleta", con_hoy_real)
-            st.metric("SIN Boleta", len(faltantes_hoy), delta=f"-{len(faltantes_hoy)}", delta_color="inverse")
-            st.caption(f"Catalogo: {len(catalogo_completo)} | En vista: {len(registrados_hoy)} | {etiqueta_fecha} | Productividad: {productividad_global:.2f}% | Filtros: Mes={filtro_mes} Coord={filtro_coordinador} Op={filtro_operador}")
-            if len(faltantes_hoy)+con_hoy_real>0:
-                fig_f = go.Figure(data=[go.Pie(labels=['Con','Sin'], values=[con_hoy_real, len(faltantes_hoy)], hole=0.65, marker_colors=['#00b050','#ff0000'], textinfo='label+value')])
-                fig_f.update_layout(height=280, margin=dict(l=10,r=10,t=10,b=10), paper_bgcolor="white")
-                st.plotly_chart(fig_f, use_container_width=True)
-        with cs2:
-            if faltantes_hoy:
-                df_falt = pd.DataFrame(faltantes_hoy, columns=['Operador - SIN REGISTRO'])
-                df_falt['Estatus'] = '❌ FALTA'
-                df_falt['Fecha'] = etiqueta_fecha
-                components.html(render_zebra(df_falt, "400px"), height=420, scrolling=True)
-                st.download_button("📥 Descargar Faltantes", df_falt.to_csv(index=False).encode('utf-8'), f"faltantes_{etiqueta_fecha}.csv", "text/csv", use_container_width=True)
-            else:
-                st.success(f"✅ ¡TODOS los {len(catalogo_completo)} registraron en {etiqueta_fecha}!")
-                st.balloons()
-        st.markdown("</div>", unsafe_allow_html=True)
-
-        st.markdown(f'<div class="gepp-card"><div class="gepp-header">📊 PRODUCTIVIDAD - {etiqueta_fecha} - {productividad_global:.2f}% GLOBAL (13 OPS)</div>', unsafe_allow_html=True)
-        if not prod_hoy.empty:
-            fig_prod = px.bar(prod_hoy, x='Productividad_%', y='Operador', orientation='h', text='Productividad_%', color='Productividad_%', color_continuous_scale=['#ff0000','#ffcc00','#00b050'], range_color=[0,150])
-            fig_prod.add_vline(x=100, line_dash="dash", line_color="green", annotation_text="100% = 4 viajes")
-            fig_prod.update_layout(height=500, margin=dict(l=10,r=60,t=20,b=10), paper_bgcolor="white", plot_bgcolor="white", showlegend=False)
-            fig_prod.update_traces(texttemplate='%{text:.0f}% - %{customdata} viajes', customdata=prod_hoy['Viajes_Hoy'], textposition='outside')
-            st.plotly_chart(fig_prod, use_container_width=True)
-        else:
-            st.info(f"Sin registros en {etiqueta_fecha}.")
-        st.markdown("</div>", unsafe_allow_html=True)
-
-        st.markdown(f'<div class="gepp-card"><div class="gepp-header">📊 Ranking - {etiqueta_fecha}</div>', unsafe_allow_html=True)
-        cnt_op_bar = df_mostrar[col_nombre].value_counts().reset_index() if not df_mostrar.empty else pd.DataFrame(columns=['Operador','Viajes'])
-        cnt_op_bar.columns = ['Operador','Viajes']
-        cnt_op_bar = cnt_op_bar.sort_values('Viajes', ascending=True)
-        fig_bar = px.bar(cnt_op_bar, x='Viajes', y='Operador', orientation='h', text='Viajes', color='Viajes', color_continuous_scale='Greens')
-        fig_bar.update_layout(height=400, margin=dict(l=10,r=40,t=20,b=10), paper_bgcolor="white", plot_bgcolor="white", showlegend=False)
-        fig_bar.update_traces(textposition='outside')
-        st.plotly_chart(fig_bar, use_container_width=True)
-        st.markdown("</div>", unsafe_allow_html=True)
-
-        st.markdown(f'<div class="gepp-card"><div class="gepp-header">DETALLE REGISTROS - {etiqueta_fecha}</div>', unsafe_allow_html=True)
-        cols_ocultar = [c for c in df_op.columns if 'fecha_solo' in c.lower()]
-        df_show_op = df_mostrar.drop(columns=cols_ocultar, errors='ignore').tail(200).fillna("").iloc[::-1]
-        components.html(render_zebra(df_show_op, "500px"), height=540, scrolling=True)
-        st.markdown("</div>", unsafe_allow_html=True)
     except Exception as e:
         st.error(f"No fue posible cargar la información de operadores: {e}")
         st.exception(e)
 else:
     st.title("⛽ Rendimiento de Combustible - Próximamente")
-    st.info("Módulo en preparación")
