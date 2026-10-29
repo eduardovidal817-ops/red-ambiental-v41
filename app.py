@@ -79,7 +79,27 @@ def load_catalogo_operadores():
         "Luis Fernando Perez Castañeda"
     ]
 
-# --- FUNCIONES BOLETA OFICIAL 2001-0098816 - FIX DUPLICADO ---
+# --- CATALOGO COORDINADORES PARA FILTROS ---
+@st.cache_data(ttl=60)
+def load_catalogo_coordinadores():
+    # Mapeo fijo de tu hoja Nombre Operadores
+    return {
+        "Agustin Castillo Sanchez": "Felix Najera",
+        "Sergio Lozano Gonzalez": "Felix Najera",
+        "Jorge Ibarra Serrato": "Sergio Llanes",
+        "Alejandro Villarreal Bustamante": "Felix Najera",
+        "Roberto Reyes Alanis": "Felix Najera",
+        "Juan Estrada Guerra": "Sergio Llanes",
+        "Luis Pérez Dominguez": "Felix Najera",
+        "Roberto Garcia Navarro": "Felix Najera",
+        "Ricardo Cazares Diaz": "Sergio Llanes",
+        "Carlos Garcia Macias": "Felix Najera",
+        "Francisco Mazuca Macias": "Sergio Llanes",
+        "Angel Garcia Navarro": "Felix Najera",
+        "Luis Fernando Perez Castañeda": "Felix Najera",
+        "Kevin Rodriguez": "Analista"
+    }
+
 def get_image_hash(file_bytes):
     return hashlib.sha256(file_bytes).hexdigest()
 
@@ -116,7 +136,6 @@ def extraer_folio_boleta(img_pil):
             folio = m.group(1).replace(' ','').strip()
             folio = re.sub(r'[^0-9\-]', '', folio)
             return folio, texto
-        # intento 2 sin palabra FOLIO, solo patrón 2001-xxxxxx
         m2 = re.search(r'(2001-[0-9]{5,10})', texto_up)
         if m2:
             return m2.group(1), texto
@@ -148,6 +167,7 @@ def render_zebra(df_to_show, max_h="340px"):
     html += "</tbody></table></div>"
     return html
 
+# ========= SIDEBAR =========
 with st.sidebar:
     try: st.image("logo.png", use_container_width=True)
     except: st.markdown("<h2 style='color:white; text-align:center;'>♻️ RED AMBIENTAL</h2>", unsafe_allow_html=True)
@@ -156,6 +176,44 @@ with st.sidebar:
     st.markdown("---")
     if st.button("🔄 ACTUALIZAR TODO", type="primary", use_container_width=True):
         st.cache_data.clear(); st.rerun()
+
+    # --- NUEVO: FILTROS SOLICITADOS ABAJO DE ACTUALIZAR ---
+    if menu == "🚛 Operadores Pesaje":
+        st.markdown("---")
+        st.markdown("### 🔍 FILTROS PESAJE")
+        try:
+            df_op_preview = load_operadores()
+            # Mes
+            try:
+                col_fecha_prev = [c for c in df_op_preview.columns if 'marca' in c.lower() or 'timestamp' in c.lower() or 'fecha' in c.lower()][0]
+                df_op_preview['mes_filtro'] = pd.to_datetime(df_op_preview[col_fecha_prev], errors='coerce', dayfirst=True).dt.strftime('%Y-%m')
+                meses_list = ["Todos"] + sorted(df_op_preview['mes_filtro'].dropna().unique().tolist(), reverse=True)
+            except:
+                meses_list = ["Todos", "2026-10"]
+            filtro_mes = st.selectbox("📅 Mes", meses_list, key="filtro_mes_sidebar")
+            
+            # Coordinador
+            map_coord = load_catalogo_coordinadores()
+            coords_list = ["Todos"] + sorted(list(set(map_coord.values())))
+            filtro_coordinador = st.selectbox("👷 Coordinador", coords_list, key="filtro_coord_sidebar")
+            
+            # Operador
+            try:
+                col_nombre_prev = [c for c in df_op_preview.columns if 'nombre' in c.lower()][0]
+                ops_list = ["Todos"] + sorted(df_op_preview[col_nombre_prev].dropna().astype(str).unique().tolist())
+            except:
+                ops_list = ["Todos"] + load_catalogo_operadores()
+            filtro_operador = st.selectbox("🚛 Operador", ops_list, key="filtro_operador_sidebar")
+        except:
+            filtro_mes = st.selectbox("📅 Mes", ["Todos"], key="filtro_mes_fallback")
+            filtro_coordinador = st.selectbox("👷 Coordinador", ["Todos","Felix Najera","Sergio Llanes","Analista"], key="filtro_coord_fallback")
+            filtro_operador = st.selectbox("🚛 Operador", ["Todos"]+load_catalogo_operadores(), key="filtro_operador_fallback")
+    else:
+        # valores por defecto para no romper Dashboard Asistencias
+        filtro_mes = "Todos"
+        filtro_coordinador = "Todos"
+        filtro_operador = "Todos"
+
     st.markdown("---")
     if menu == "📊 Dashboard Asistencias":
         df_full['Fecha_dt'] = pd.to_datetime(df_full['Fecha'], dayfirst=True, errors='coerce')
@@ -169,6 +227,7 @@ with st.sidebar:
         coord_sel = st.selectbox("Coordinador", coords)
         dentro_sel = st.selectbox("¿Dentro?", ["Todos","DENTRO","FUERA"])
 
+# ========= RESTO DE TU CODIGO IGUAL =========
 if menu == "📊 Dashboard Asistencias":
     df = df_full.copy()
     if fecha_sel and isinstance(fecha_sel, tuple) and len(fecha_sel)==2:
@@ -324,13 +383,10 @@ elif menu == "🚛 Operadores Pesaje":
                     else:
                         st.warning("⚠️ No detecté FOLIO automático, escríbelo abajo")
 
-                    # --- BLOQUEO DUPLICADO MEJORADO ---
                     try:
                         df_check = load_operadores()
-                        # busca en cualquier columna si existe ese folio o hash
                         todo_texto = df_check.astype(str).values.flatten()
                         todo_joined = " ".join(todo_texto)
-                        
                         if folio_detectado and folio_detectado in todo_joined:
                             st.error(f"❌ ESTA BOLETA YA HA SIDO REGISTRADA - Folio {folio_detectado} ya existe en tu Sheet")
                             folio_valido = False
@@ -358,13 +414,11 @@ elif menu == "🚛 Operadores Pesaje":
                     st.error(f"Error leyendo imagen: {e}")
                     fecha_valida = False
 
-        # Campo manual para folio si no se leyó
         if foto and not folio_detectado:
             folio_manual = st.text_input("✍️ Escribe FOLIO manualmente (ej: 2001-0098816)", key="folio_manual_input")
             if folio_manual:
                 folio_detectado = folio_manual.strip()
                 st.info(f"📄 Usando folio manual: {folio_detectado}")
-                # revalidar duplicado con manual
                 try:
                     df_check = load_operadores()
                     todo_joined = " ".join(df_check.astype(str).values.flatten())
@@ -413,6 +467,21 @@ elif menu == "🚛 Operadores Pesaje":
             df_op['fecha_solo'] = df_op['fecha_solo'].fillna(hoy_mty)
         except:
             df_op['fecha_solo'] = hoy_mty
+
+        # --- NUEVO: APLICAR FILTROS DEL SIDEBAR ---
+        map_coord = load_catalogo_coordinadores()
+        df_op['Coordinador_calc'] = df_op[col_nombre].map(map_coord).fillna("SIN ASIGNAR")
+        df_op['mes_filtro'] = pd.to_datetime(df_op[col_fecha], errors='coerce', dayfirst=True).dt.strftime('%Y-%m')
+        
+        # Filtro Mes
+        if filtro_mes != "Todos":
+            df_op = df_op[df_op['mes_filtro'] == filtro_mes]
+        # Filtro Coordinador
+        if filtro_coordinador != "Todos":
+            df_op = df_op[df_op['Coordinador_calc'] == filtro_coordinador]
+        # Filtro Operador
+        if filtro_operador != "Todos":
+            df_op = df_op[df_op[col_nombre].astype(str).str.strip() == filtro_operador]
 
         st.markdown('<div class="gepp-card"><div class="gepp-header">📅 FILTRO OPERADORES - POR DIA / ACUMULADO</div></div>', unsafe_allow_html=True)
         f1, f2 = st.columns([1,2])
@@ -510,6 +579,39 @@ elif menu == "🚛 Operadores Pesaje":
             st.plotly_chart(fig3, use_container_width=True)
             st.markdown("</div>", unsafe_allow_html=True)
 
+        # --- NUEVO: GRAFICAS SOLICITADAS COORDINADORES ---
+        st.markdown(f'<div class="gepp-card"><div class="gepp-header">👷 VIAJES POR COORDINADOR - {etiqueta_fecha}</div>', unsafe_allow_html=True)
+        c_coord1, c_coord2 = st.columns(2)
+        with c_coord1:
+            if not df_mostrar.empty:
+                df_coord_viajes = df_mostrar.groupby('Coordinador_calc').size().reset_index(name='Viajes')
+                df_coord_viajes = df_coord_viajes.sort_values('Viajes', ascending=False)
+                fig_coord = px.bar(df_coord_viajes, x='Coordinador_calc', y='Viajes', text='Viajes', color='Coordinador_calc',
+                                   title="Coordinador que lleva más viajes", color_discrete_sequence=px.colors.qualitative.Bold)
+                fig_coord.update_traces(textposition='outside')
+                fig_coord.update_layout(height=400, showlegend=False)
+                st.plotly_chart(fig_coord, use_container_width=True)
+            else:
+                st.info("Sin datos para coordinadores")
+        with c_coord2:
+            if not df_mostrar.empty:
+                # Cumplimiento por coordinador
+                total_ops_por_coord = pd.DataFrame(list(map_coord.items()), columns=['Operador','Coordinador_calc']).groupby('Coordinador_calc').size().reset_index(name='Ops_Asignados')
+                total_ops_por_coord['Viajes_Asignados'] = total_ops_por_coord['Ops_Asignados'] * META_DIARIA * (dias_filtro if modo_vista!="Por Día" else 1)
+                df_cumpl = df_mostrar.groupby('Coordinador_calc').size().reset_index(name='Viajes_Realizados')
+                df_cumpl = pd.merge(total_ops_por_coord, df_cumpl, on='Coordinador_calc', how='left').fillna(0)
+                df_cumpl['% Cumplimiento'] = (df_cumpl['Viajes_Realizados'] / df_cumpl['Viajes_Asignados'] * 100).round(1)
+                fig_cumpl = px.bar(df_cumpl, x='Coordinador_calc', y='% Cumplimiento', text='% Cumplimiento', color='% Cumplimiento',
+                                   title="% Cumplimiento por Coordinador", color_continuous_scale=['#ff0000','#ffcc00','#00b050'], range_color=[0,100])
+                fig_cumpl.add_hline(y=100, line_dash="dash", line_color="green", annotation_text="100% Meta")
+                fig_cumpl.update_layout(height=400)
+                fig_cumpl.update_traces(texttemplate='%{text:.1f}%')
+                st.plotly_chart(fig_cumpl, use_container_width=True)
+                st.dataframe(df_cumpl, use_container_width=True)
+            else:
+                st.info("Sin datos cumplimiento")
+        st.markdown("</div>", unsafe_allow_html=True)
+
         st.markdown(f'<div class="gepp-card"><div class="gepp-header">🚨 OPERADORES SIN REGISTRO - {etiqueta_fecha} - 13 REALES</div>', unsafe_allow_html=True)
         catalogo_completo = load_catalogo_operadores()
         registrados_hoy = df_hoy[col_nombre].astype(str).str.strip().unique().tolist() if not df_hoy.empty else []
@@ -532,7 +634,7 @@ elif menu == "🚛 Operadores Pesaje":
         with cs1:
             st.metric("Con Boleta", con_hoy_real)
             st.metric("SIN Boleta", len(faltantes_hoy), delta=f"-{len(faltantes_hoy)}", delta_color="inverse")
-            st.caption(f"Catalogo: {len(catalogo_completo)} | En vista: {len(registrados_hoy)} | {etiqueta_fecha} | Productividad: {productividad_global:.2f}%")
+            st.caption(f"Catalogo: {len(catalogo_completo)} | En vista: {len(registrados_hoy)} | {etiqueta_fecha} | Productividad: {productividad_global:.2f}% | Filtros: Mes={filtro_mes} Coord={filtro_coordinador} Op={filtro_operador}")
             if len(faltantes_hoy)+con_hoy_real>0:
                 fig_f = go.Figure(data=[go.Pie(labels=['Con','Sin'], values=[con_hoy_real, len(faltantes_hoy)], hole=0.65, marker_colors=['#00b050','#ff0000'], textinfo='label+value')])
                 fig_f.update_layout(height=280, margin=dict(l=10,r=10,t=10,b=10), paper_bgcolor="white")
