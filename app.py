@@ -26,6 +26,7 @@ section[data-testid="stSidebar"] { background-color: #0a2211; }
 URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRdHGoaJ3BSFqaU4DIH1Wks7dROyzp3z7Z_guIBoAD7VzSXCIis14R9HMPCaDmF3omEK5RzEDlua1aR/pub?gid=1011674108&single=true&output=csv"
 ID_SHEET_BOLETAS = "1-9KNHfB0syWmZNFGfti3mIEjTjFjbSz3qKiAiyXXvms"
 URL_OPERADORES = "https://script.google.com/macros/s/AKfycbxfb7MVBqN_3xk5a9ICVa7X9zKWtH1s9PEfgv_QpU0iW54q6_gldoNgXbpHU8DztwI/exec"
+GID_BASE_OPERADORES = "1457146895"
 
 @st.cache_data(ttl=60)
 def load():
@@ -61,11 +62,38 @@ def load_operadores():
     return df
 
 @st.cache_data(ttl=60)
+def load_catalogo_base():
+    try:
+        url_base = f"https://docs.google.com/spreadsheets/d/{ID_SHEET_BOLETAS}/export?format=csv&gid={GID_BASE_OPERADORES}"
+        dfb = pd.read_csv(url_base)
+        dfb.columns = [str(c).strip() for c in dfb.columns]
+        col_nom = [c for c in dfb.columns if 'nombre' in c.lower()][0]
+        col_coord = [c for c in dfb.columns if 'coordinador' in c.lower()][0]
+        col_viajes = [c for c in dfb.columns if 'viaje' in c.lower()][0]
+        col_base = [c for c in dfb.columns if 'base' in c.lower()][0]
+        dfb = dfb.rename(columns={col_nom: 'Nombre Completo', col_coord: 'Coordinadores', col_viajes: 'Viajes Asignados', col_base: 'Base asignada'})
+        dfb = dfb.dropna(subset=['Nombre Completo'])
+        dfb['Nombre Completo'] = dfb['Nombre Completo'].astype(str).str.strip()
+        dfb['Coordinadores'] = dfb['Coordinadores'].astype(str).str.strip()
+        dfb['Base asignada'] = dfb['Base asignada'].astype(str).str.strip()
+        dfb['Viajes Asignados'] = pd.to_numeric(dfb['Viajes Asignados'], errors='coerce').fillna(4)
+        dfb = dfb[dfb['Nombre Completo'] != '']
+        return dfb
+    except:
+        return pd.DataFrame(columns=['Nombre Completo','Coordinadores','Viajes Asignados','Base asignada'])
+
+@st.cache_data(ttl=60)
 def load_catalogo_operadores():
+    dfb = load_catalogo_base()
+    if not dfb.empty:
+        return dfb['Nombre Completo'].tolist()
     return ["Agustin Castillo Sanchez","Sergio Lozano Gonzalez","Jorge Ibarra Serrato","Alejandro Villarreal Bustamante","Roberto Reyes Alanis","Juan Estrada Guerra","Luis Pérez Dominguez","Roberto Garcia Navarro","Ricardo Cazares Diaz","Carlos Garcia Macias","Francisco Mazuca Macias","Angel Garcia Navarro","Luis Fernando Perez Castañeda"]
 
 @st.cache_data(ttl=60)
 def load_catalogo_coordinadores():
+    dfb = load_catalogo_base()
+    if not dfb.empty:
+        return dict(zip(dfb['Nombre Completo'], dfb['Coordinadores']))
     return {"Agustin Castillo Sanchez": "Felix Najera","Sergio Lozano Gonzalez": "Felix Najera","Jorge Ibarra Serrato": "Sergio Llanes","Alejandro Villarreal Bustamante": "Felix Najera","Roberto Reyes Alanis": "Felix Najera","Juan Estrada Guerra": "Sergio Llanes","Luis Pérez Dominguez": "Felix Najera","Roberto Garcia Navarro": "Felix Najera","Ricardo Cazares Diaz": "Sergio Llanes","Carlos Garcia Macias": "Felix Najera","Francisco Mazuca Macias": "Sergio Llanes","Angel Garcia Navarro": "Felix Najera","Luis Fernando Perez Castañeda": "Felix Najera","Kevin Rodriguez": "Analista"}
 
 def norm_txt(s):
@@ -281,8 +309,6 @@ if menu == "📊 Dashboard Asistencias":
             fig_hist.update_layout(height=300, margin=dict(l=10,r=10,t=10,b=10), paper_bgcolor="white", plot_bgcolor="white")
             st.plotly_chart(fig_hist, use_container_width=True)
         st.markdown("</div>", unsafe_allow_html=True)
-
-    # === NUEVO BLOQUE ACUMULADO POR MES Y SEMANA POR PERSONA - V45.3.2 ===
     st.markdown('<div class="gepp-card"><div class="gepp-header">📈 ASISTENCIA ACUMULADA POR MES Y SEMANA - POR PERSONA</div>', unsafe_allow_html=True)
     try:
         df_acum = df.copy()
@@ -336,8 +362,6 @@ if menu == "📊 Dashboard Asistencias":
         st.error(f"Error en acumulado: {e}")
         st.exception(e)
     st.markdown("</div>", unsafe_allow_html=True)
-    # === FIN NUEVO BLOQUE ===
-
     st.markdown('<div class="gepp-card"><div class="gepp-header">DETALLE - PERSONAL - PRO ZEBRA - LEYENDO DEL DRIVE</div>', unsafe_allow_html=True)
     cols_final = ['Fecha','Hora Entrada','Hora Salida','Horas Trabajadas','Nombre completo','Numero Empleado','Latitud','Longitud','¿Dentro?','Fotos','Planta','Coordinador','Semáforo']
     cols_final = [c for c in cols_final if c in df.columns]
@@ -348,7 +372,6 @@ if menu == "📊 Dashboard Asistencias":
 elif menu == "🚛 Operadores Pesaje":
     st.markdown("<h1 style='color:#0f3d1f; text-align:center;'>RED AMBIENTAL</h1>", unsafe_allow_html=True)
     st.markdown("<h2 style='color:#2e7d32; text-align:center;'>🚛 Dashboard Operadores - Pesaje</h2>", unsafe_allow_html=True)
-    
     with st.expander("📝 Registrar Nuevo Viaje - CANDADO FECHA Y FOLIO", expanded=False):
         c1,c2 = st.columns(2)
         with c1:
@@ -357,12 +380,10 @@ elif menu == "🚛 Operadores Pesaje":
         with c2:
             base = st.text_input("Base donde se encuentra", placeholder="Garcia, Cienega...", key="op_b")
             foto = st.file_uploader("Foto Boleta OFICIAL - SOLO DEL DIA", type=["jpg","jpeg","png"], key="op_f")
-
         fecha_valida = False
         folio_detectado = None
         hash_imagen = None
         folio_valido = True
-
         if foto:
             st.image(foto, caption="Vista previa boleta", width=350)
             file_bytes = foto.getvalue()
@@ -406,7 +427,6 @@ elif menu == "🚛 Operadores Pesaje":
                 except Exception as e:
                     st.error(f"Error leyendo imagen: {e}")
                     fecha_valida = False
-
         if foto and not folio_detectado:
             folio_manual = st.text_input("✍️ Escribe FOLIO manualmente (ej: 2001-0098816)", key="folio_manual_input")
             if folio_manual:
@@ -420,7 +440,6 @@ elif menu == "🚛 Operadores Pesaje":
                         folio_valido = False
                         fecha_valida = False
                 except: pass
-
         if st.button("💾 Guardar Registro Operador", type="primary", use_container_width=True):
             if not nombre or not unidad or not base or not foto:
                 st.error("❌ Complete todos los campos obligatorios")
@@ -439,7 +458,6 @@ elif menu == "🚛 Operadores Pesaje":
                     st.success(f"✅ Registro guardado - BOLETA DEL DIA - Folio {folio_detectado}")
                     st.balloons()
                     st.cache_data.clear()
-
     try:
         df_op = load_operadores()
         col_nombre = [c for c in df_op.columns if 'nombre' in c.lower()][0]
@@ -459,7 +477,6 @@ elif menu == "🚛 Operadores Pesaje":
             df_op['fecha_solo'] = df_op['fecha_solo'].fillna(hoy_mty)
         except:
             df_op['fecha_solo'] = hoy_mty
-
         map_coord = load_catalogo_coordinadores()
         map_norm = {norm_txt(k): v for k, v in map_coord.items()}
         if 'Coordinadores' in df_op.columns:
@@ -468,14 +485,12 @@ elif menu == "🚛 Operadores Pesaje":
             df_op['Coordinador_calc'] = None
         df_op['Coordinador_calc'] = df_op.apply(lambda r: r['Coordinador_calc'] if pd.notna(r['Coordinador_calc']) and str(r['Coordinador_calc']).strip()!="" else map_norm.get(norm_txt(r[col_nombre]), "Felix Najera"), axis=1)
         df_op['mes_filtro'] = pd.to_datetime(df_op[col_fecha], errors='coerce', dayfirst=True).dt.strftime('%Y-%m')
-        
         if filtro_mes != "Todos":
             df_op = df_op[df_op['mes_filtro'] == filtro_mes]
         if filtro_coordinador != "Todos":
             df_op = df_op[df_op['Coordinador_calc'] == filtro_coordinador]
         if filtro_operador != "Todos":
             df_op = df_op[df_op[col_nombre].astype(str).str.strip() == filtro_operador]
-
         st.markdown('<div class="gepp-card"><div class="gepp-header">📅 FILTRO OPERADORES - POR DIA / ACUMULADO</div></div>', unsafe_allow_html=True)
         f1, f2 = st.columns([1,2])
         with f1:
@@ -504,14 +519,17 @@ elif menu == "🚛 Operadores Pesaje":
                     df_hoy = df_op[df_op['fecha_solo'] == df_op['fecha_solo'].max()].copy()
                     etiqueta_fecha = "TODO ACUMULADO"
                     dias_filtro = df_mostrar['fecha_solo'].nunique() if not df_mostrar.empty else 1
-
-        TOTAL_OPS_FIJO = 13
+        # --- TOTAL DINAMICO DESDE DRIVE ---
+        df_base_cat = load_catalogo_base()
+        if not df_base_cat.empty:
+            TOTAL_OPS_FIJO = len(df_base_cat)
+        else:
+            TOTAL_OPS_FIJO = 13
         META_TOTAL_DIA_FIJO = TOTAL_OPS_FIJO * META_DIARIA
         if modo_vista == "Acumulado por Rango":
             META_TOTAL_FILTRO = META_TOTAL_DIA_FIJO * dias_filtro
         else:
             META_TOTAL_FILTRO = META_TOTAL_DIA_FIJO
-
         if not df_mostrar.empty:
             prod_hoy = df_mostrar[col_nombre].value_counts().reset_index()
             prod_hoy.columns = ['Operador','Viajes_Hoy']
@@ -528,9 +546,7 @@ elif menu == "🚛 Operadores Pesaje":
             prod_hoy = pd.DataFrame()
             total_viajes_mostrar = 0
             ops_hoy = 0
-
         productividad_global = (total_viajes_mostrar / META_TOTAL_FILTRO * 100) if META_TOTAL_FILTRO>0 else 0
-
         c1,c2,c3,c4 = st.columns([0.9,1.1,1.1,1.1])
         with c1:
             color_prod = "#00ff66" if productividad_global>=80 else "#ffcc00" if productividad_global>=40 else "#ff3333"
@@ -572,36 +588,73 @@ elif menu == "🚛 Operadores Pesaje":
             st.plotly_chart(fig3, use_container_width=True)
             st.markdown("</div>", unsafe_allow_html=True)
 
-        st.markdown(f'<div class="gepp-card"><div class="gepp-header">👷 VIAJES POR COORDINADOR - {etiqueta_fecha}</div>', unsafe_allow_html=True)
+        # === NUEVO - SEPARADO POR BASE: GARCIA vs MONDELEZ ===
+        try:
+            map_base_norm = {norm_txt(k): v for k,v in dict(zip(df_base_cat['Nombre Completo'], df_base_cat['Base asignada'])).items()} if not df_base_cat.empty else {}
+            df_mostrar['Base_asignada'] = df_mostrar[col_nombre].apply(lambda x: map_base_norm.get(norm_txt(x), "Sin Base"))
+            df_garcia = df_mostrar[df_mostrar['Base_asignada'].astype(str).str.contains("Garcia", case=False, na=False)]
+            df_mondelez = df_mostrar[~df_mostrar['Base_asignada'].astype(str).str.contains("Garcia", case=False, na=False)]
+            df_mondelez = df_mondelez[df_mondelez['Base_asignada'].astype(str).str.contains("Mondelez", case=False, na=False)]
+            st.markdown(f'<div class="gepp-card"><div class="gepp-header">🏭 SEPARADO POR BASE - GARCIA vs MONDELEZ - {etiqueta_fecha}</div>', unsafe_allow_html=True)
+            cg1, cg2 = st.columns(2)
+            with cg1:
+                st.markdown(f"#### García - {len(df_garcia)} boletas")
+                if not df_garcia.empty:
+                    cnt_g = df_garcia[col_nombre].value_counts().reset_index(); cnt_g.columns=['Operador','Viajes']
+                    fig_g = px.bar(cnt_g, x='Viajes', y='Operador', orientation='h', text='Viajes', color='Viajes', color_continuous_scale='Greens', title="García - Viajes por operador")
+                    st.plotly_chart(fig_g, use_container_width=True)
+                else: st.info("Sin viajes García en este filtro")
+                n_garcia = len(df_base_cat[df_base_cat['Base asignada'].str.contains("Garcia", case=False, na=False)]) if not df_base_cat.empty else 0
+                meta_g = n_garcia * META_DIARIA * dias_filtro
+                prod_g = (len(df_garcia)/meta_g*100) if meta_g>0 else 0
+                st.metric("Productividad García", f"{prod_g:.2f}%", f"{len(df_garcia)} / {meta_g}")
+            with cg2:
+                st.markdown(f"#### Mondelez - {len(df_mondelez)} boletas - SEPARADO")
+                if not df_mondelez.empty:
+                    cnt_m = df_mondelez[col_nombre].value_counts().reset_index(); cnt_m.columns=['Operador','Viajes']
+                    fig_m = px.bar(cnt_m, x='Viajes', y='Operador', orientation='h', text='Viajes', color='Viajes', color_continuous_scale='Purples', title="Mondelez - Viajes por operador")
+                    st.plotly_chart(fig_m, use_container_width=True)
+                    cnt_mb = df_mondelez['Base_asignada'].value_counts().reset_index(); cnt_mb.columns=['Base','Viajes']
+                    fig_mb = px.pie(cnt_mb, names='Base', values='Viajes', hole=0.6, title="Mondelez MTY vs Salinas")
+                    st.plotly_chart(fig_mb, use_container_width=True)
+                else: st.info("Sin viajes Mondelez en este filtro")
+                n_mondelez = len(df_base_cat[df_base_cat['Base asignada'].str.contains("Mondelez", case=False, na=False)]) if not df_base_cat.empty else 0
+                meta_m = n_mondelez * META_DIARIA * dias_filtro
+                prod_m = (len(df_mondelez)/meta_m*100) if meta_m>0 else 0
+                st.metric("Productividad Mondelez", f"{prod_m:.2f}%", f"{len(df_mondelez)} / {meta_m}")
+            st.markdown("</div>", unsafe_allow_html=True)
+        except Exception as e:
+            st.error(f"Error separado por base: {e}")
+
+        st.markdown(f'<div class="gepp-card"><div class="gepp-header">👷 VIAJES POR COORDINADOR - {etiqueta_fecha} - INCLUYE MOISES Y MIGUEL POR BASE</div>', unsafe_allow_html=True)
         c_coord1, c_coord2 = st.columns(2)
         with c_coord1:
             if not df_mostrar.empty:
                 df_coord_viajes = df_mostrar.groupby('Coordinador_calc').size().reset_index(name='Viajes')
                 df_coord_viajes = df_coord_viajes.sort_values('Viajes', ascending=False)
-                fig_coord = px.bar(df_coord_viajes, x='Coordinador_calc', y='Viajes', text='Viajes', color='Coordinador_calc', title="Coordinador que lleva más viajes")
+                fig_coord = px.bar(df_coord_viajes, x='Coordinador_calc', y='Viajes', text='Viajes', color='Coordinador_calc', title="Coordinador que lleva más viajes - Todos")
                 fig_coord.update_traces(textposition='outside')
                 fig_coord.update_layout(height=400, showlegend=False)
                 st.plotly_chart(fig_coord, use_container_width=True)
             else:
                 st.info("Sin datos para coordinadores")
         with c_coord2:
-            if not df_mostrar.empty:
-                total_ops_por_coord = pd.DataFrame(list(map_coord.items()), columns=['Operador','Coordinador_calc']).groupby('Coordinador_calc').size().reset_index(name='Ops_Asignados')
-                total_ops_por_coord['Viajes_Asignados'] = total_ops_por_coord['Ops_Asignados'] * META_DIARIA * (dias_filtro if modo_vista!="Por Día" else 1)
-                df_cumpl = df_mostrar.groupby('Coordinador_calc').size().reset_index(name='Viajes_Realizados')
-                df_cumpl = pd.merge(total_ops_por_coord, df_cumpl, on='Coordinador_calc', how='left').fillna(0)
-                df_cumpl['% Cumplimiento'] = (df_cumpl['Viajes_Realizados'] / df_cumpl['Viajes_Asignados'] * 100).round(1)
-                fig_cumpl = px.bar(df_cumpl, x='Coordinador_calc', y='% Cumplimiento', text='% Cumplimiento', color='% Cumplimiento', title="% Cumplimiento por Coordinador", color_continuous_scale=['#ff0000','#ffcc00','#00b050'], range_color=[0,100])
+            if not df_mostrar.empty and not df_base_cat.empty:
+                df_coord_base = df_base_cat.groupby(['Coordinadores','Base asignada']).size().reset_index(name='Ops_Asignados')
+                df_coord_base['Meta_Base'] = df_coord_base['Ops_Asignados'] * META_DIARIA * dias_filtro
+                df_viajes_coord = df_mostrar.groupby('Coordinador_calc').size().reset_index(name='Viajes_Realizados')
+                df_cumpl_base = pd.merge(df_coord_base, df_viajes_coord, left_on='Coordinadores', right_on='Coordinador_calc', how='left').fillna(0)
+                df_cumpl_base['% Cumplimiento'] = (df_cumpl_base['Viajes_Realizados'] / df_cumpl_base['Meta_Base'] * 100).round(1)
+                fig_cumpl = px.bar(df_cumpl_base, x='Coordinadores', y='% Cumplimiento', color='Base asignada', barmode='group', text='% Cumplimiento', title="% Cumplimiento por Coordinador y Base")
                 fig_cumpl.add_hline(y=100, line_dash="dash", line_color="green", annotation_text="100% Meta")
                 fig_cumpl.update_layout(height=400)
                 fig_cumpl.update_traces(texttemplate='%{text:.1f}%')
                 st.plotly_chart(fig_cumpl, use_container_width=True)
-                st.dataframe(df_cumpl, use_container_width=True)
+                st.dataframe(df_cumpl_base, use_container_width=True)
             else:
                 st.info("Sin datos cumplimiento")
         st.markdown("</div>", unsafe_allow_html=True)
-
-        st.markdown(f'<div class="gepp-card"><div class="gepp-header">🚨 OPERADORES SIN REGISTRO - {etiqueta_fecha} - 13 REALES</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="gepp-card"><div class="gepp-header">🚨 OPERADORES SIN REGISTRO - {etiqueta_fecha} - DINAMICO DESDE DRIVE</div>', unsafe_allow_html=True)
         catalogo_completo = load_catalogo_operadores()
         registrados_hoy = df_hoy[col_nombre].astype(str).str.strip().unique().tolist() if not df_hoy.empty else []
         def norm(s):
@@ -633,14 +686,18 @@ elif menu == "🚛 Operadores Pesaje":
                 df_falt = pd.DataFrame(faltantes_hoy, columns=['Operador - SIN REGISTRO'])
                 df_falt['Estatus'] = '❌ FALTA'
                 df_falt['Fecha'] = etiqueta_fecha
+                if not df_base_cat.empty:
+                    map_base_falt = {norm_txt(k): v for k,v in dict(zip(df_base_cat['Nombre Completo'], df_base_cat['Base asignada'])).items()}
+                    map_coord_falt = {norm_txt(k): v for k,v in dict(zip(df_base_cat['Nombre Completo'], df_base_cat['Coordinadores'])).items()}
+                    df_falt['Base asignada'] = df_falt['Operador - SIN REGISTRO'].apply(lambda x: map_base_falt.get(norm_txt(x), ""))
+                    df_falt['Coordinador'] = df_falt['Operador - SIN REGISTRO'].apply(lambda x: map_coord_falt.get(norm_txt(x), ""))
                 components.html(render_zebra(df_falt, "400px"), height=420, scrolling=True)
                 st.download_button("📥 Descargar Faltantes", df_falt.to_csv(index=False).encode('utf-8'), f"faltantes_{etiqueta_fecha}.csv", "text/csv", use_container_width=True)
             else:
                 st.success(f"✅ ¡TODOS los {len(catalogo_completo)} registraron en {etiqueta_fecha}!")
                 st.balloons()
         st.markdown("</div>", unsafe_allow_html=True)
-
-        st.markdown(f'<div class="gepp-card"><div class="gepp-header">📊 PRODUCTIVIDAD - {etiqueta_fecha} - {productividad_global:.2f}% GLOBAL (13 OPS)</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="gepp-card"><div class="gepp-header">📊 PRODUCTIVIDAD - {etiqueta_fecha} - {productividad_global:.2f}% GLOBAL ({TOTAL_OPS_FIJO} OPS)</div>', unsafe_allow_html=True)
         if not prod_hoy.empty:
             fig_prod = px.bar(prod_hoy, x='Productividad_%', y='Operador', orientation='h', text='Productividad_%', color='Productividad_%', color_continuous_scale=['#ff0000','#ffcc00','#00b050'], range_color=[0,150])
             fig_prod.add_vline(x=100, line_dash="dash", line_color="green", annotation_text="100% = 4 viajes")
@@ -650,7 +707,6 @@ elif menu == "🚛 Operadores Pesaje":
         else:
             st.info(f"Sin registros en {etiqueta_fecha}.")
         st.markdown("</div>", unsafe_allow_html=True)
-
         st.markdown(f'<div class="gepp-card"><div class="gepp-header">📊 Ranking - {etiqueta_fecha}</div>', unsafe_allow_html=True)
         cnt_op_bar = df_mostrar[col_nombre].value_counts().reset_index() if not df_mostrar.empty else pd.DataFrame(columns=['Operador','Viajes'])
         cnt_op_bar.columns = ['Operador','Viajes']
@@ -660,7 +716,6 @@ elif menu == "🚛 Operadores Pesaje":
         fig_bar.update_traces(textposition='outside')
         st.plotly_chart(fig_bar, use_container_width=True)
         st.markdown("</div>", unsafe_allow_html=True)
-
         st.markdown(f'<div class="gepp-card"><div class="gepp-header">DETALLE REGISTROS - {etiqueta_fecha}</div>', unsafe_allow_html=True)
         cols_ocultar = [c for c in df_op.columns if 'fecha_solo' in c.lower()]
         df_show_op = df_mostrar.drop(columns=cols_ocultar, errors='ignore').tail(200).fillna("").iloc[::-1]
