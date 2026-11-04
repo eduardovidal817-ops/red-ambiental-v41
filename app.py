@@ -20,6 +20,9 @@ st.markdown("""
 section[data-testid="stSidebar"] { background-color: #0a2211; }
 .gepp-card { background:white; border:1px solid #b0b8c8; border-radius:6px; overflow:hidden; margin-bottom:8px; box-shadow:0 1px 3px rgba(0,0,0,0.1); }
 .gepp-header { background:#0f3d1f; color:white; padding:6px 12px; font-size:11px; font-weight:700; text-align:center; text-transform:uppercase; }
+.metric-box { background:white; border:1px solid #d0d0d0; border-radius:8px; padding:14px; text-align:center; }
+.metric-num { font-size:32px; font-weight:900; color:#0f3d1f; margin:0; line-height:1; }
+.metric-sub { font-size:12px; color:#666; font-weight:700; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -67,7 +70,6 @@ def norm_txt(s):
         return ' '.join(s.split()).upper()
     except: return ""
 
-# === CATALOGO FIJO DE TU FOTO - NO DEPENDE DEL GID, POR ESO YA NO SALE SIN BASE ===
 CATALOGO_BASE_FOTO = [
     ("Agustin Castillo Sanchez", "Felix Najera", 4, "Garcia"),
     ("Sergio Lozano Gonzalez", "Felix Najera", 4, "Garcia"),
@@ -95,13 +97,10 @@ CATALOGO_BASE_FOTO = [
 
 @st.cache_data(ttl=60)
 def load_catalogo_base():
-    dfb = pd.DataFrame(CATALOGO_BASE_FOTO, columns=['Nombre Completo','Coordinadores','Viajes Asignados','Base asignada'])
-    return dfb
-
+    return pd.DataFrame(CATALOGO_BASE_FOTO, columns=['Nombre Completo','Coordinadores','Viajes Asignados','Base asignada'])
 @st.cache_data(ttl=60)
 def load_catalogo_operadores():
     return [x[0] for x in CATALOGO_BASE_FOTO]
-
 @st.cache_data(ttl=60)
 def load_catalogo_coordinadores():
     return {x[0]: x[1] for x in CATALOGO_BASE_FOTO}
@@ -547,10 +546,23 @@ elif menu == "🚛 Operadores Pesaje":
             total_viajes_mostrar = 0
             ops_hoy = 0
         productividad_global = (total_viajes_mostrar / META_TOTAL_FILTRO * 100) if META_TOTAL_FILTRO>0 else 0
-        # === CALCULAR BASE ASIGNADA UNA SOLA VEZ - ARREGLADO ===
         map_base_norm = {norm_txt(k): v for k,v in dict(zip(df_base_cat['Nombre Completo'], df_base_cat['Base asignada'])).items()} if not df_base_cat.empty else {}
         df_mostrar['Base_asignada'] = df_mostrar[col_nombre].apply(lambda x: map_base_norm.get(norm_txt(x), "Sin Base"))
-        # === FIN FIX ===
+        # --- CALCULO PARA RESUMEN DE ARRIBA ---
+        df_garcia_top = df_mostrar[df_mostrar['Base_asignada'].astype(str).str.contains("Garcia", case=False, na=False)]
+        df_mondelez_top = df_mostrar[df_mostrar['Base_asignada'].astype(str).str.contains("Mondelez", case=False, na=False)]
+        df_mty_top = df_mostrar[df_mostrar['Base_asignada'].astype(str).str.contains("Mondelez MTY", case=False, na=False)]
+        df_salinas_top = df_mostrar[df_mostrar['Base_asignada'].astype(str).str.contains("Salinas", case=False, na=False)]
+        n_garcia_top = len(df_base_cat[df_base_cat['Base asignada'].str.contains("Garcia", case=False, na=False)])
+        n_mty_top = len(df_base_cat[df_base_cat['Base asignada'].str.contains("Mondelez MTY", case=False, na=False)])
+        n_salinas_top = len(df_base_cat[df_base_cat['Base asignada'].str.contains("Salinas", case=False, na=False)])
+        meta_g_top = n_garcia_top * META_DIARIA * dias_filtro
+        meta_mty_top = n_mty_top * META_DIARIA * dias_filtro
+        meta_sal_top = n_salinas_top * META_DIARIA * dias_filtro
+        prod_g_top = (len(df_garcia_top)/meta_g_top*100) if meta_g_top>0 else 0
+        prod_mty_top = (len(df_mty_top)/meta_mty_top*100) if meta_mty_top>0 else 0
+        prod_sal_top = (len(df_salinas_top)/meta_sal_top*100) if meta_sal_top>0 else 0
+
         c1,c2,c3,c4 = st.columns([0.9,1.1,1.1,1.1])
         with c1:
             color_prod = "#00ff66" if productividad_global>=80 else "#ffcc00" if productividad_global>=40 else "#ff3333"
@@ -591,10 +603,25 @@ elif menu == "🚛 Operadores Pesaje":
             fig3.update_traces(textposition='outside')
             st.plotly_chart(fig3, use_container_width=True)
             st.markdown("</div>", unsafe_allow_html=True)
-        # === SEPARADO POR BASE: GARCIA vs MONDELEZ - YA ARREGLADO ===
+
+        # === NUEVO - RESUMEN ARRIBA EN NUMEROS, SIN CIRCULOS GRANDES ===
+        st.markdown('<div class="gepp-card"><div class="gepp-header">📊 RESUMEN POR BASE - EN NUMERO - SIN CIRCULOS - ' + etiqueta_fecha + '</div>', unsafe_allow_html=True)
+        r_top1, r_top2, r_top3, r_top4 = st.columns(4)
+        with r_top1:
+            st.markdown(f'<div class="metric-box"><p class="metric-sub">🏭 GARCIA</p><p class="metric-num">{prod_g_top:.2f}%</p><p class="metric-sub">✅ {len(df_garcia_top)} / {meta_g_top} boletas</p><p class="metric-sub">{n_garcia_top} operadores</p></div>', unsafe_allow_html=True)
+        with r_top2:
+            prod_mondelez_top = (len(df_mondelez_top)/(meta_mty_top+meta_sal_top)*100) if (meta_mty_top+meta_sal_top)>0 else 0
+            st.markdown(f'<div class="metric-box" style="border:2px solid #6a1b9a;"><p class="metric-sub">🍫 MONDELEZ TOTAL</p><p class="metric-num" style="color:#6a1b9a;">{prod_mondelez_top:.2f}%</p><p class="metric-sub">✅ {len(df_mondelez_top)} / {meta_mty_top+meta_sal_top} boletas</p><p class="metric-sub">{n_mty_top+n_salinas_top} operadores</p></div>', unsafe_allow_html=True)
+        with r_top3:
+            st.markdown(f'<div class="metric-box"><p class="metric-sub">🍫 MONDELEZ MTY - Moises</p><p class="metric-num">{prod_mty_top:.2f}%</p><p class="metric-sub">✅ {len(df_mty_top)} / {meta_mty_top} boletas</p><p class="metric-sub">{n_mty_top} operadores</p></div>', unsafe_allow_html=True)
+        with r_top4:
+            st.markdown(f'<div class="metric-box"><p class="metric-sub">🍫 MONDELEZ SALINAS - Miguel</p><p class="metric-num">{prod_sal_top:.2f}%</p><p class="metric-sub">✅ {len(df_salinas_top)} / {meta_sal_top} boletas</p><p class="metric-sub">{n_salinas_top} operadores</p></div>', unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        # === SEPARADO POR BASE: GARCIA vs MONDELEZ - SIN CIRCULOTE ===
         try:
-            df_garcia = df_mostrar[df_mostrar['Base_asignada'].astype(str).str.contains("Garcia", case=False, na=False)]
-            df_mondelez = df_mostrar[df_mostrar['Base_asignada'].astype(str).str.contains("Mondelez", case=False, na=False)]
+            df_garcia = df_garcia_top
+            df_mondelez = df_mondelez_top
             st.markdown(f'<div class="gepp-card"><div class="gepp-header">🏭 SEPARADO POR BASE - GARCIA vs MONDELEZ - {etiqueta_fecha}</div>', unsafe_allow_html=True)
             cg1, cg2 = st.columns(2)
             with cg1:
@@ -604,24 +631,23 @@ elif menu == "🚛 Operadores Pesaje":
                     fig_g = px.bar(cnt_g, x='Viajes', y='Operador', orientation='h', text='Viajes', color='Viajes', color_continuous_scale='Greens', title="García - Viajes por operador")
                     st.plotly_chart(fig_g, use_container_width=True)
                 else: st.info("Sin viajes García en este filtro")
-                n_garcia = len(df_base_cat[df_base_cat['Base asignada'].str.contains("Garcia", case=False, na=False)]) if not df_base_cat.empty else 0
-                meta_g = n_garcia * META_DIARIA * dias_filtro
-                prod_g = (len(df_garcia)/meta_g*100) if meta_g>0 else 0
-                st.metric("Productividad García", f"{prod_g:.2f}%", f"{len(df_garcia)} / {meta_g}")
+                st.markdown(f'<div class="metric-box"><p class="metric-sub">Productividad García</p><p class="metric-num">{prod_g_top:.2f}%</p><p class="metric-sub">✅ {len(df_garcia)} / {meta_g_top}</p></div>', unsafe_allow_html=True)
             with cg2:
                 st.markdown(f"#### Mondelez - {len(df_mondelez)} boletas - SEPARADO")
                 if not df_mondelez.empty:
                     cnt_m = df_mondelez[col_nombre].value_counts().reset_index(); cnt_m.columns=['Operador','Viajes']
                     fig_m = px.bar(cnt_m, x='Viajes', y='Operador', orientation='h', text='Viajes', color='Viajes', color_continuous_scale='Purples', title="Mondelez - Viajes por operador")
                     st.plotly_chart(fig_m, use_container_width=True)
-                    cnt_mb = df_mondelez['Base_asignada'].value_counts().reset_index(); cnt_mb.columns=['Base','Viajes']
-                    fig_mb = px.pie(cnt_mb, names='Base', values='Viajes', hole=0.6, title="Mondelez MTY vs Salinas")
-                    st.plotly_chart(fig_mb, use_container_width=True)
                 else: st.info("Sin viajes Mondelez en este filtro")
-                n_mondelez = len(df_base_cat[df_base_cat['Base asignada'].str.contains("Mondelez", case=False, na=False)]) if not df_base_cat.empty else 0
-                meta_m = n_mondelez * META_DIARIA * dias_filtro
-                prod_m = (len(df_mondelez)/meta_m*100) if meta_m>0 else 0
-                st.metric("Productividad Mondelez", f"{prod_m:.2f}%", f"{len(df_mondelez)} / {meta_m}")
+                # AQUI YA NO VA EL CIRCULOTE - PURO NUMERO COMO PEDISTE
+                prod_mondelez_abajo = (len(df_mondelez)/(meta_mty_top+meta_sal_top)*100) if (meta_mty_top+meta_sal_top)>0 else 0
+                c_mondelez_num1, c_mondelez_num2, c_mondelez_num3 = st.columns(3)
+                with c_mondelez_num1:
+                    st.markdown(f'<div class="metric-box"><p class="metric-sub">Mondelez Total</p><p class="metric-num">{prod_mondelez_abajo:.2f}%</p><p class="metric-sub">✅ {len(df_mondelez)} / {meta_mty_top+meta_sal_top}</p></div>', unsafe_allow_html=True)
+                with c_mondelez_num2:
+                    st.markdown(f'<div class="metric-box"><p class="metric-sub">Mondelez MTY</p><p class="metric-num">{prod_mty_top:.2f}%</p><p class="metric-sub">✅ {len(df_mty_top)} / {meta_mty_top}</p></div>', unsafe_allow_html=True)
+                with c_mondelez_num3:
+                    st.markdown(f'<div class="metric-box"><p class="metric-sub">Mondelez Salinas</p><p class="metric-num">{prod_sal_top:.2f}%</p><p class="metric-sub">✅ {len(df_salinas_top)} / {meta_sal_top}</p></div>', unsafe_allow_html=True)
             st.markdown("</div>", unsafe_allow_html=True)
         except Exception as e:
             st.error(f"Error separado por base: {e}")
