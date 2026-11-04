@@ -26,7 +26,6 @@ section[data-testid="stSidebar"] { background-color: #0a2211; }
 URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRdHGoaJ3BSFqaU4DIH1Wks7dROyzp3z7Z_guIBoAD7VzSXCIis14R9HMPCaDmF3omEK5RzEDlua1aR/pub?gid=1011674108&single=true&output=csv"
 ID_SHEET_BOLETAS = "1-9KNHfB0syWmZNFGfti3mIEjTjFjbSz3qKiAiyXXvms"
 URL_OPERADORES = "https://script.google.com/macros/s/AKfycbxfb7MVBqN_3xk5a9ICVa7X9zKWtH1s9PEfgv_QpU0iW54q6_gldoNgXbpHU8DztwI/exec"
-GID_BASE_OPERADORES = "1457146895"
 
 @st.cache_data(ttl=60)
 def load():
@@ -61,47 +60,52 @@ def load_operadores():
     df.columns = df.columns.str.strip()
     return df
 
-@st.cache_data(ttl=60)
-def load_catalogo_base():
-    try:
-        url_base = f"https://docs.google.com/spreadsheets/d/{ID_SHEET_BOLETAS}/export?format=csv&gid={GID_BASE_OPERADORES}"
-        dfb = pd.read_csv(url_base)
-        dfb.columns = [str(c).strip() for c in dfb.columns]
-        col_nom = [c for c in dfb.columns if 'nombre' in c.lower()][0]
-        col_coord = [c for c in dfb.columns if 'coordinador' in c.lower()][0]
-        col_viajes = [c for c in dfb.columns if 'viaje' in c.lower()][0]
-        col_base = [c for c in dfb.columns if 'base' in c.lower()][0]
-        dfb = dfb.rename(columns={col_nom: 'Nombre Completo', col_coord: 'Coordinadores', col_viajes: 'Viajes Asignados', col_base: 'Base asignada'})
-        dfb = dfb.dropna(subset=['Nombre Completo'])
-        dfb['Nombre Completo'] = dfb['Nombre Completo'].astype(str).str.strip()
-        dfb['Coordinadores'] = dfb['Coordinadores'].astype(str).str.strip()
-        dfb['Base asignada'] = dfb['Base asignada'].astype(str).str.strip()
-        dfb['Viajes Asignados'] = pd.to_numeric(dfb['Viajes Asignados'], errors='coerce').fillna(4)
-        dfb = dfb[dfb['Nombre Completo'] != '']
-        return dfb
-    except:
-        return pd.DataFrame(columns=['Nombre Completo','Coordinadores','Viajes Asignados','Base asignada'])
-
-@st.cache_data(ttl=60)
-def load_catalogo_operadores():
-    dfb = load_catalogo_base()
-    if not dfb.empty:
-        return dfb['Nombre Completo'].tolist()
-    return ["Agustin Castillo Sanchez","Sergio Lozano Gonzalez","Jorge Ibarra Serrato","Alejandro Villarreal Bustamante","Roberto Reyes Alanis","Juan Estrada Guerra","Luis Pérez Dominguez","Roberto Garcia Navarro","Ricardo Cazares Diaz","Carlos Garcia Macias","Francisco Mazuca Macias","Angel Garcia Navarro","Luis Fernando Perez Castañeda"]
-
-@st.cache_data(ttl=60)
-def load_catalogo_coordinadores():
-    dfb = load_catalogo_base()
-    if not dfb.empty:
-        return dict(zip(dfb['Nombre Completo'], dfb['Coordinadores']))
-    return {"Agustin Castillo Sanchez": "Felix Najera","Sergio Lozano Gonzalez": "Felix Najera","Jorge Ibarra Serrato": "Sergio Llanes","Alejandro Villarreal Bustamante": "Felix Najera","Roberto Reyes Alanis": "Felix Najera","Juan Estrada Guerra": "Sergio Llanes","Luis Pérez Dominguez": "Felix Najera","Roberto Garcia Navarro": "Felix Najera","Ricardo Cazares Diaz": "Sergio Llanes","Carlos Garcia Macias": "Felix Najera","Francisco Mazuca Macias": "Sergio Llanes","Angel Garcia Navarro": "Felix Najera","Luis Fernando Perez Castañeda": "Felix Najera","Kevin Rodriguez": "Analista"}
-
 def norm_txt(s):
     try:
         s = str(s).strip()
         s = ''.join(c for c in unicodedata.normalize('NFD', s) if unicodedata.category(c) != 'Mn')
         return ' '.join(s.split()).upper()
     except: return ""
+
+# === CATALOGO FIJO DE TU FOTO - NO DEPENDE DEL GID, POR ESO YA NO SALE SIN BASE ===
+CATALOGO_BASE_FOTO = [
+    ("Agustin Castillo Sanchez", "Felix Najera", 4, "Garcia"),
+    ("Sergio Lozano Gonzalez", "Felix Najera", 4, "Garcia"),
+    ("Jorge Ibarra Serrato", "Sergio Llanes", 4, "Garcia"),
+    ("Alejandro Villarreal Bustamante", "Felix Najera", 4, "Garcia"),
+    ("Roberto Reyes Alanis", "Felix Najera", 4, "Garcia"),
+    ("Juan Estrada Guerra", "Sergio Llanes", 4, "Garcia"),
+    ("Luis Pérez Dominguez", "Felix Najera", 4, "Garcia"),
+    ("Roberto Garcia Navarro", "Felix Najera", 4, "Garcia"),
+    ("Ricardo Cazares Diaz", "Sergio Llanes", 4, "Garcia"),
+    ("Carlos Garcia Macias", "Felix Najera", 4, "Garcia"),
+    ("Francisco Mazuca Macias", "Sergio Llanes", 4, "Garcia"),
+    ("Kevin Rodriguez Lopez", "Analista", 4, "Garcia"),
+    ("Angel Garcia Navarro", "Felix Najera", 4, "Garcia"),
+    ("Luis Fernando Perez Castañeda", "Felix Najera", 4, "Garcia"),
+    ("Anhuar Camarillo Grimaldo", "Moises del Angel Martin", 4, "Mondelez MTY"),
+    ("Francisco Joaquin Sauceda", "Miguel de La Rosa", 4, "Mondelez Salinas"),
+    ("Abel Jara Reyes", "Miguel de La Rosa", 4, "Mondelez Salinas"),
+    ("Hugo Peña Salazar", "Miguel de La Rosa", 4, "Mondelez Salinas"),
+    ("Adrian Ramirez Dominguez", "Miguel de La Rosa", 4, "Mondelez Salinas"),
+    ("Juan Ramon Espinoza Coppel", "Moises del Angel Martin", 4, "Mondelez MTY"),
+    ("Missael Camarillo Estrada", "Moises del Angel Martin", 4, "Mondelez MTY"),
+    ("Victor Lares Flores", "Miguel de La Rosa", 4, "Mondelez Salinas"),
+]
+
+@st.cache_data(ttl=60)
+def load_catalogo_base():
+    dfb = pd.DataFrame(CATALOGO_BASE_FOTO, columns=['Nombre Completo','Coordinadores','Viajes Asignados','Base asignada'])
+    return dfb
+
+@st.cache_data(ttl=60)
+def load_catalogo_operadores():
+    return [x[0] for x in CATALOGO_BASE_FOTO]
+
+@st.cache_data(ttl=60)
+def load_catalogo_coordinadores():
+    return {x[0]: x[1] for x in CATALOGO_BASE_FOTO}
+
 def get_image_hash(file_bytes): return hashlib.sha256(file_bytes).hexdigest()
 def mejorar_imagen_para_ocr(img_pil):
     img = img_pil.convert('L'); w, h = img.size; img = img.resize((w*2, h*2)); return img
@@ -519,12 +523,8 @@ elif menu == "🚛 Operadores Pesaje":
                     df_hoy = df_op[df_op['fecha_solo'] == df_op['fecha_solo'].max()].copy()
                     etiqueta_fecha = "TODO ACUMULADO"
                     dias_filtro = df_mostrar['fecha_solo'].nunique() if not df_mostrar.empty else 1
-        # --- TOTAL DINAMICO DESDE DRIVE ---
         df_base_cat = load_catalogo_base()
-        if not df_base_cat.empty:
-            TOTAL_OPS_FIJO = len(df_base_cat)
-        else:
-            TOTAL_OPS_FIJO = 13
+        TOTAL_OPS_FIJO = len(df_base_cat) if not df_base_cat.empty else 13
         META_TOTAL_DIA_FIJO = TOTAL_OPS_FIJO * META_DIARIA
         if modo_vista == "Acumulado por Rango":
             META_TOTAL_FILTRO = META_TOTAL_DIA_FIJO * dias_filtro
@@ -547,6 +547,10 @@ elif menu == "🚛 Operadores Pesaje":
             total_viajes_mostrar = 0
             ops_hoy = 0
         productividad_global = (total_viajes_mostrar / META_TOTAL_FILTRO * 100) if META_TOTAL_FILTRO>0 else 0
+        # === CALCULAR BASE ASIGNADA UNA SOLA VEZ - ARREGLADO ===
+        map_base_norm = {norm_txt(k): v for k,v in dict(zip(df_base_cat['Nombre Completo'], df_base_cat['Base asignada'])).items()} if not df_base_cat.empty else {}
+        df_mostrar['Base_asignada'] = df_mostrar[col_nombre].apply(lambda x: map_base_norm.get(norm_txt(x), "Sin Base"))
+        # === FIN FIX ===
         c1,c2,c3,c4 = st.columns([0.9,1.1,1.1,1.1])
         with c1:
             color_prod = "#00ff66" if productividad_global>=80 else "#ffcc00" if productividad_global>=40 else "#ff3333"
@@ -587,14 +591,10 @@ elif menu == "🚛 Operadores Pesaje":
             fig3.update_traces(textposition='outside')
             st.plotly_chart(fig3, use_container_width=True)
             st.markdown("</div>", unsafe_allow_html=True)
-
-        # === NUEVO - SEPARADO POR BASE: GARCIA vs MONDELEZ ===
+        # === SEPARADO POR BASE: GARCIA vs MONDELEZ - YA ARREGLADO ===
         try:
-            map_base_norm = {norm_txt(k): v for k,v in dict(zip(df_base_cat['Nombre Completo'], df_base_cat['Base asignada'])).items()} if not df_base_cat.empty else {}
-            df_mostrar['Base_asignada'] = df_mostrar[col_nombre].apply(lambda x: map_base_norm.get(norm_txt(x), "Sin Base"))
             df_garcia = df_mostrar[df_mostrar['Base_asignada'].astype(str).str.contains("Garcia", case=False, na=False)]
-            df_mondelez = df_mostrar[~df_mostrar['Base_asignada'].astype(str).str.contains("Garcia", case=False, na=False)]
-            df_mondelez = df_mondelez[df_mondelez['Base_asignada'].astype(str).str.contains("Mondelez", case=False, na=False)]
+            df_mondelez = df_mostrar[df_mostrar['Base_asignada'].astype(str).str.contains("Mondelez", case=False, na=False)]
             st.markdown(f'<div class="gepp-card"><div class="gepp-header">🏭 SEPARADO POR BASE - GARCIA vs MONDELEZ - {etiqueta_fecha}</div>', unsafe_allow_html=True)
             cg1, cg2 = st.columns(2)
             with cg1:
@@ -625,7 +625,6 @@ elif menu == "🚛 Operadores Pesaje":
             st.markdown("</div>", unsafe_allow_html=True)
         except Exception as e:
             st.error(f"Error separado por base: {e}")
-
         st.markdown(f'<div class="gepp-card"><div class="gepp-header">👷 VIAJES POR COORDINADOR - {etiqueta_fecha} - INCLUYE MOISES Y MIGUEL POR BASE</div>', unsafe_allow_html=True)
         c_coord1, c_coord2 = st.columns(2)
         with c_coord1:
