@@ -93,6 +93,8 @@ CATALOGO_BASE_FOTO = [
     ("Juan Ramon Espinoza Coppel", "Moises del Angel Martin", 4, "Mondelez MTY"),
     ("Missael Camarillo Estrada", "Moises del Angel Martin", 4, "Mondelez MTY"),
     ("Victor Lares Flores", "Miguel de La Rosa", 4, "Mondelez Salinas"),
+    ("Luis David Guzman Campos", "Miguel de La Rosa", 4, "Mondelez Salinas"),
+    ("Luis Alberto Garcia Garcia", "Miguel de La Rosa", 4, "Mondelez Salinas"),
 ]
 
 @st.cache_data(ttl=60)
